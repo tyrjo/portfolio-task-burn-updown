@@ -1,106 +1,106 @@
+Ext.define('Rally.example.CFDCalculator', {
+    extend: 'Rally.data.lookback.calculator.TimeSeriesCalculator',
+    config: {
+        stateFieldName: 'ScheduleState',
+        stateFieldValues: ['Defined', 'In-Progress', 'Completed', 'Accepted']
+    },
+
+    constructor: function(config) {
+        this.initConfig(config);
+        this.callParent(arguments);
+    },
+
+    getMetrics: function() {
+        return _.map(this.getStateFieldValues(), function(stateFieldValue) {
+            return  {
+                as: stateFieldValue,
+                groupByField: this.getStateFieldName(),
+                allowedValues: [stateFieldValue],
+                f: 'groupByCount',
+                display: 'area'
+            };
+        }, this);
+    }
+});
+
 Ext.define("PTBUD", {
     extend: 'Rally.app.App',
-    componentCls: 'app',
-    logger: new Rally.technicalservices.Logger(),
-    defaults: { margin: 10 },
-    items: [
-        {xtype:'container',itemId:'message_box',tpl:'Hello, <tpl>{_refObjectName}</tpl>'},
-        {xtype:'container',itemId:'display_box'}
+   
+    requires: [
+        'Rally.example.CFDCalculator'
     ],
 
-    integrationHeaders : {
-        name : "PTBUD"
-    },
-                        
     launch: function() {
-        var me = this;
-        this.setLoading("Loading stuff...");
-
-        this.down('#message_box').update(this.getContext().getUser());
-        
-        var model_name = 'Defect',
-            field_names = ['Name','State'];
-        
-        this._loadAStoreWithAPromise(model_name, field_names).then({
-            scope: this,
-            success: function(store) {
-                this._displayGrid(store,field_names);
+        this.add({
+            xtype: 'rallychart',
+            storeType: 'Rally.data.lookback.SnapshotStore',
+            storeConfig: this._getStoreConfig(),
+            calculatorType: 'Rally.example.CFDCalculator',
+            calculatorConfig: {
+                stateFieldName: 'ScheduleState',
+                stateFieldValues: ['Defined', 'In-Progress', 'Completed', 'Accepted']
             },
-            failure: function(error_message){
-                alert(error_message);
-            }
-        }).always(function() {
-            me.setLoading(false);
+            chartConfig: this._getChartConfig()
         });
-    },
-      
-    _loadWsapiRecords: function(config){
-        var deferred = Ext.create('Deft.Deferred');
-        var me = this;
-        var default_config = {
-            model: 'Defect',
-            fetch: ['ObjectID']
-        };
-        this.logger.log("Starting load:",config.model);
-        Ext.create('Rally.data.wsapi.Store', Ext.Object.merge(default_config,config)).load({
-            callback : function(records, operation, successful) {
-                if (successful){
-                    deferred.resolve(records);
-                } else {
-                    me.logger.log("Failed: ", operation);
-                    deferred.reject('Problem loading: ' + operation.error.errors.join('. '));
-                }
-            }
-        });
-        return deferred.promise;
     },
 
-    _loadAStoreWithAPromise: function(model_name, model_fields){
-        var deferred = Ext.create('Deft.Deferred');
-        var me = this;
-        this.logger.log("Starting load:",model_name,model_fields);
-          
-        Ext.create('Rally.data.wsapi.Store', {
-            model: model_name,
-            fetch: model_fields
-        }).load({
-            callback : function(records, operation, successful) {
-                if (successful){
-                    deferred.resolve(this);
-                } else {
-                    me.logger.log("Failed: ", operation);
-                    deferred.reject('Problem loading: ' + operation.error.errors.join('. '));
+    /**
+     * Generate the store config to retrieve all snapshots for stories and defects in the current project scope
+     * within the last 30 days
+     */
+    _getStoreConfig: function() {
+        return {
+            find: {
+                _TypeHierarchy: { '$in' : [ 'HierarchicalRequirement', 'Defect' ] },
+                Children: null,
+                _ProjectHierarchy: this.getContext().getProject().ObjectID,
+                _ValidFrom: {'$gt': Rally.util.DateTime.toIsoString(Rally.util.DateTime.add(new Date(), 'day', -30)) }
+            },
+            fetch: ['ScheduleState'],
+            hydrate: ['ScheduleState'],
+            sort: {
+                _ValidFrom: 1
+            },
+            context: this.getContext().getDataContext(),
+            limit: Infinity
+        };
+    },
+
+    /**
+     * Generate a valid Highcharts configuration object to specify the chart
+     */
+    _getChartConfig: function() {
+        return {
+            chart: {
+                zoomType: 'xy'
+            },
+            title: {
+                text: 'Project Cumulative Flow'
+            },
+            xAxis: {
+                tickmarkPlacement: 'on',
+                tickInterval: 20,
+                title: {
+                    text: 'Date'
+                }
+            },
+            yAxis: [
+                {
+                    title: {
+                        text: 'Count'
+                    }
+                }
+            ],
+            plotOptions: {
+                series: {
+                    marker: {
+                        enabled: false
+                    }
+                },
+                area: {
+                    stacking: 'normal'
                 }
             }
-        });
-        return deferred.promise;
-    },
-    
-    _displayGrid: function(store,field_names){
-        this.down('#display_box').add({
-            xtype: 'rallygrid',
-            store: store,
-            columnCfgs: field_names
-        });
-    },
-    
-    getOptions: function() {
-        return [
-            {
-                text: 'About...',
-                handler: this._launchInfo,
-                scope: this
-            }
-        ];
-    },
-    
-    _launchInfo: function() {
-        if ( this.about_dialog ) { this.about_dialog.destroy(); }
-        this.about_dialog = Ext.create('Rally.technicalservices.InfoLink',{});
-    },
-    
-    isExternal: function(){
-        return typeof(this.getAppId()) == 'undefined';
+        };
     }
-    
 });

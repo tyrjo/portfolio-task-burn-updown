@@ -5,14 +5,14 @@ Ext.define('Rally.example.CFDCalculator', {
         stateFieldValues: ['Defined', 'In-Progress', 'Completed', 'Accepted']
     },
 
-    constructor: function(config) {
+    constructor: function (config) {
         this.initConfig(config);
         this.callParent(arguments);
     },
 
-    getMetrics: function() {
-        return _.map(this.getStateFieldValues(), function(stateFieldValue) {
-            return  {
+    getMetrics: function () {
+        return _.map(this.getStateFieldValues(), function (stateFieldValue) {
+            return {
                 as: stateFieldValue,
                 groupByField: this.getStateFieldName(),
                 allowedValues: [stateFieldValue],
@@ -25,12 +25,12 @@ Ext.define('Rally.example.CFDCalculator', {
 
 Ext.define("PTBUD", {
     extend: 'Rally.app.App',
-   
+
     requires: [
         'Rally.example.CFDCalculator'
     ],
 
-    launch: function() {
+    launch: function () {
         this.add({
             xtype: 'rallychart',
             storeType: 'Rally.data.lookback.SnapshotStore',
@@ -48,13 +48,13 @@ Ext.define("PTBUD", {
      * Generate the store config to retrieve all snapshots for stories and defects in the current project scope
      * within the last 30 days
      */
-    _getStoreConfig: function() {
+    _getStoreConfig: function () {
         return {
             find: {
-                _TypeHierarchy: { '$in' : [ 'HierarchicalRequirement', 'Defect' ] },
+                _TypeHierarchy: { '$in': ['HierarchicalRequirement', 'Defect'] },
                 Children: null,
                 _ProjectHierarchy: this.getContext().getProject().ObjectID,
-                _ValidFrom: {'$gt': Rally.util.DateTime.toIsoString(Rally.util.DateTime.add(new Date(), 'day', -30)) }
+                _ValidFrom: { '$gt': Rally.util.DateTime.toIsoString(Rally.util.DateTime.add(new Date(), 'day', -30)) }
             },
             fetch: ['ScheduleState'],
             hydrate: ['ScheduleState'],
@@ -69,7 +69,7 @@ Ext.define("PTBUD", {
     /**
      * Generate a valid Highcharts configuration object to specify the chart
      */
-    _getChartConfig: function() {
+    _getChartConfig: function () {
         return {
             chart: {
                 zoomType: 'xy'

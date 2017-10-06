@@ -130,11 +130,11 @@ Ext.define("PTBUD", {
                 zoomType: 'xy'
             },
             title: {
-                text: 'Project Cumulative Flow'
+                text: 'Portfolio Task Hours'
             },
             xAxis: {
                 tickmarkPlacement: 'on',
-                tickInterval: 20,
+                tickInterval: 1,
                 title: {
                     text: 'Date'
                 }
@@ -142,7 +142,7 @@ Ext.define("PTBUD", {
             yAxis: [
                 {
                     title: {
-                        text: 'Count'
+                        text: 'Hours'
                     }
                 }
             ],

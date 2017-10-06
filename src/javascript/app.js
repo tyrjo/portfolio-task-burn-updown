@@ -1,10 +1,5 @@
 Ext.define('Rally.example.CFDCalculator', {
     extend: 'Rally.data.lookback.calculator.TimeSeriesCalculator',
-    config: {
-        // stateFieldName: 'ScheduleState',
-        // stateFieldValues: ['Defined', 'In-Progress', 'Completed', 'Accepted'],
-
-    },
 
     constructor: function (config) {
         this.initConfig(config);
@@ -26,17 +21,6 @@ Ext.define('Rally.example.CFDCalculator', {
                 display: 'column'
             }
         ];
-        /*
-        return _.map(this.getStateFieldValues(), function (stateFieldValue) {
-            return {
-                as: stateFieldValue,
-                groupByField: this.getStateFieldName(),
-                allowedValues: [stateFieldValue],
-                f: 'groupByCount',
-                display: 'column'
-            };
-        }, this);
-        */
     }
 });
 
@@ -57,7 +41,19 @@ Ext.define("PTBUD", {
     },
 
     getSettingsFields: function () {
-        return this.chartSettings && this.chartSettings.getSettingsConfiguration();
+        var self = this;
+        return [
+            {
+                xtype: 'container',
+                layout: {
+                    type: 'vbox'
+                },
+                minHeight: 350,
+                items: [
+                    Ext.create('widget.chartportfolioitempicker')
+                ]
+            }
+        ];
     },
 
     _getCurrentStories: function () {
@@ -116,17 +112,10 @@ Ext.define("PTBUD", {
                     },
                     chartConfig: this._getChartConfig()
                 });
-                this._setupChartSettings();
             },
             failure: function (msg) {
                 Ext.Msg.alert(msg);
             }
-        });
-    },
-
-    _setupChartSettings: function () {
-        this.chartSettings = Ext.create("Rally.apps.charts.rpm.ChartSettings", {
-            app: this
         });
     },
 

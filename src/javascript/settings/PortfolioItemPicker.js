@@ -17,9 +17,12 @@
         ],
 
         mixins: [
-            'Ext.form.field.Field',
-            'Rally.apps.charts.settings.SettingsChangeMixin'
+            'Ext.form.field.Field'
         ],
+
+        config: {
+            app: undefined
+        },
 
         emptyText: '<p>No portfolio items match your search criteria.</p>',
 
@@ -59,6 +62,11 @@
             }
         ],
 
+        constructor: function(config) {
+            this.initConfig(config);
+            this.app = Rally.getApp();
+        },
+
         initComponent: function () {
             this.callParent(arguments);
             this._addTestClass();
@@ -85,14 +93,14 @@
 
         _setupRequestContext: function () {
             this.requestContext = {
-                workspace: this.settingsParent.app.context.getWorkspaceRef(),
+                workspace: this.app.context.getWorkspaceRef(),
                 project: null
             };
         },
 
         _setValueFromSettings: function () {
-            var newSettingsValue = this.settingsParent.app.getSetting("portfolioItemPicker"),
-                oldSettingsValue = this.settingsParent.app.getSetting("buttonchooser");
+            var newSettingsValue = this.app.getSetting("portfolioItemPicker"),
+                oldSettingsValue = this.app.getSetting("buttonchooser");
 
             if (this._isSettingValid(newSettingsValue)) {
                 this.setValue(newSettingsValue);
@@ -287,7 +295,7 @@
                 this.value = value;
             }
             else {
-                this.value = this.settingsParent.app.getSetting("portfolioItemPicker");
+                this.value = this.app.getSetting("portfolioItemPicker");
             }
         },
 

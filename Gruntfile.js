@@ -223,7 +223,7 @@ module.exports = function(grunt) {
         var installApp = function(page_oid,panel_oid) {
             // TODO (tj) allow pretty deployments
             // DEFAULT TO ugly for deploying
-            var html = grunt.file.read('deploy/Ugly.txt');
+            var html = grunt.file.read(deploy_file_name);
 
             var uri = config.auth.server + "/slm/dashboard/changepanelsettings.sp";
             grunt.log.writeln('URI:', uri);
@@ -404,9 +404,9 @@ module.exports = function(grunt) {
     grunt.registerTask('test-fast', "Run tests that don't need to connect to Rally", ['jasmine:fast']);
     grunt.registerTask('test-slow', "Run tests that need to connect to Rally", ['jasmine:slow']);
 
-    grunt.registerTask('test-and-deploy', 'Build and deploy app to the location in auth.json',['test-fast','ugly','install']);
+    grunt.registerTask('test-and-deploy', 'Build and deploy app to the location in auth.json',['test-fast','ugly','install:deploy/Ugly.txt']);
 
-    grunt.registerTask('deploy', 'Build and deploy app to the location in auth.json',['ugly','install']);
+    grunt.registerTask('deploy', 'Build and deploy app to the location in auth.json',['ugly','install:deploy/Ugly.txt']);
 
-    grunt.registerTask('deploy-pretty', 'Build and deploy app to the location in auth.json',['pretty','install']);
+    grunt.registerTask('deploy-pretty', 'Build and deploy app to the location in auth.json',['pretty','install:deploy/App.txt']);
 };

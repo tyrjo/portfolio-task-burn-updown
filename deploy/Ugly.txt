@@ -3,13 +3,13 @@
 <head>
     <title>Portfolio Task Burn Up/Down</title>
     <!--  (c) 2017 CA Technologies.  All Rights Reserved. -->
-    <!--  Build Date: Fri Oct 06 2017 12:59:58 GMT-0600 (MDT) -->
+    <!--  Build Date: Fri Oct 06 2017 13:09:49 GMT-0600 (MDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Fri Oct 06 2017 12:59:58 GMT-0600 (MDT)";
+        var APP_BUILD_DATE = "Fri Oct 06 2017 13:09:49 GMT-0600 (MDT)";
         var STORY    = "";
         var BUILDER  = "johty01";
-        var CHECKSUM = 20477636164;
+        var CHECKSUM = 20477634694;
     </script>
     
     <script type="text/javascript" src="/apps/2.1/sdk.js"></script>

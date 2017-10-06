@@ -1,5 +1,3 @@
-const MY_PROJECT_ID = 161729654772;
-
 Ext.define('Rally.example.CFDCalculator', {
     extend: 'Rally.data.lookback.calculator.TimeSeriesCalculator',
     config: {
@@ -42,6 +40,7 @@ Ext.define('Rally.example.CFDCalculator', {
     }
 });
 
+// TODO (tj) more verbose app class
 Ext.define("PTBUD", {
     extend: 'Rally.app.App',
 
@@ -49,9 +48,7 @@ Ext.define("PTBUD", {
         'Rally.example.CFDCalculator'
     ],
 
-    listeners: {
-
-    },
+    listeners: {},
 
     config: {
         defaultSettings: {
@@ -63,21 +60,68 @@ Ext.define("PTBUD", {
         return this.chartSettings && this.chartSettings.getSettingsConfiguration();
     },
 
-    launch: function () {
-        this.add({
-            xtype: 'rallychart',
-            storeType: 'Rally.data.lookback.SnapshotStore',
-            storeConfig: this._getStoreConfig(),
-            calculatorType: 'Rally.example.CFDCalculator',
-            calculatorConfig: {
-                // stateFieldName: 'ScheduleState',
-                // stateFieldValues: ['Defined', 'In-Progress', 'Completed', 'Accepted'],
-                granularity: 'hour'
+    _getCurrentStories: function () {
+        var deferred = Ext.create('Deft.Deferred');
+        var itemOids = this._getPortfolioItems();
+        Ext.create('Rally.data.lookback.SnapshotStore', {
+            listeners: {
+                load: function (store, data, success) {
+                    if (!success) {
+                        deferred.reject("Unable to load user stories");
+                    }
+
+                    deferred.resolve(data.map(function (story) {
+                        return story.get('ObjectID');
+                    }))
+                }
             },
-            chartConfig: this._getChartConfig()
+            autoLoad: true,
+            fetch: ['ObjectID'],
+            filters: [
+                {
+                    property: '_ItemHierarchy',
+                    operator: 'in',
+                    value: itemOids
+                },
+                {
+                    property: '_TypeHierarchy',
+                    value: 'HierarchicalRequirement'
+                },
+                {
+                    property: 'Children',
+                    value: null
+                },
+                {
+                    property: '__At',
+                    value: 'current'
+                }
+            ]
         });
-        console.log(this.getSettings());
-        this._setupChartSettings();
+
+        return deferred.promise;
+    },
+
+    launch: function () {
+
+        this._getCurrentStories().then({
+            scope: this,
+            success: function (oids) {
+                this.add({
+                    xtype: 'rallychart',
+                    storeType: 'Rally.data.lookback.SnapshotStore',
+                    storeConfig: this._getStoreConfig(oids),
+                    calculatorType: 'Rally.example.CFDCalculator',
+                    calculatorConfig: {
+                        granularity: 'hour'
+                    },
+                    chartConfig: this._getChartConfig()
+                });
+                this._setupChartSettings();
+            },
+            failure: function (msg) {
+                Ext.Msg.alert(msg);
+            }
+        });
     },
 
     _setupChartSettings: function () {
@@ -90,13 +134,13 @@ Ext.define("PTBUD", {
      * Generate the store config to retrieve all snapshots for stories and defects in the current project scope
      * within the last 30 days
      */
-    _getStoreConfig: function () {
-        console.log(this._getPortfolioItems());
+    _getStoreConfig: function (oids) {
         return {
             find: {
                 _TypeHierarchy: {'$in': ['HierarchicalRequirement']},
                 Children: null,
-                _ItemHierarchy: {'$in' : this._getPortfolioItems()},
+                ObjectID: {'$in': oids},
+                //_ItemHierarchy: {'$in': this._getPortfolioItems()},
                 //_ValidFrom: { '$gt': Rally.util.DateTime.toIsoString(Rally.util.DateTime.add(new Date(), 'day', -30)) }
                 _ValidFrom: {'$lt': Rally.util.DateTime.toIsoString(new Date())}
             },
@@ -106,18 +150,13 @@ Ext.define("PTBUD", {
             },
             context: this.getContext().getDataContext(),
             limit: Infinity,
-            listeners: {
-                load: function (store, records) {
-                    console.log(records);
-                }
-            }
         };
     },
 
-    _getPortfolioItems: function() {
+    _getPortfolioItems: function () {
         var refs = this.getSetting('portfolioItemPicker').split(',');
-        return refs.map( function(ref) {
-           return Rally.util.Ref.getOidFromRef(ref);
+        return refs.map(function (ref) {
+            return Rally.util.Ref.getOidFromRef(ref);
         });
     },
 

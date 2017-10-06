@@ -4,7 +4,8 @@
   "version": "0.2.0",
   "scripts": {
     "debug": "grunt debug",
-    "debug:watch": "nodemon --exec grunt debug"
+    "debug:watch": "nodemon --exec grunt debug",
+    "deploy:watch": "nodemon --exec grunt deploy "
   },
   "dependencies": {},
   "devDependencies": {

@@ -92,7 +92,7 @@ module.exports = function(grunt) {
         },
         watch: {
             files: ['test/fast/**/*-spec.js',config.js_files, config.css_files],
-            tasks: ['deploy-pretty']
+            tasks: ['test-and-deploy']
         },
         jasmine: {
             fast: {
@@ -223,8 +223,7 @@ module.exports = function(grunt) {
         var installApp = function(page_oid,panel_oid) {
             // TODO (tj) allow pretty deployments
             // DEFAULT TO ugly for deploying
-            //var html = grunt.file.read('deploy/Ugly.txt');
-            var html = grunt.file.read('deploy/App.txt');
+            var html = grunt.file.read('deploy/Ugly.txt');
 
             var uri = config.auth.server + "/slm/dashboard/changepanelsettings.sp";
             grunt.log.writeln('URI:', uri);

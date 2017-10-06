@@ -23,7 +23,8 @@
   },
   "nodemonConfig": {
     "watch": [
-      "src/"
+      "src/",
+      "config.json"
     ]
   }
 }

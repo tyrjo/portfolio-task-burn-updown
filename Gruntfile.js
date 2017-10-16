@@ -70,6 +70,13 @@ module.exports = function(grunt) {
                     variables: config
                 },
 
+                debug: {
+                    src: 'templates/App-debug-tpl.html',
+                    dest: 'deploy/App.txt',
+                    engine: 'underscore',
+                    variables: config
+                },
+
                 prod: {
                     src: 'templates/App-tpl.html',
                     dest: 'deploy/App.txt',
@@ -221,9 +228,7 @@ module.exports = function(grunt) {
         request.defaults({jar: j});
 
         var installApp = function(page_oid,panel_oid) {
-            // TODO (tj) allow pretty deployments
-            // DEFAULT TO ugly for deploying
-            var html = grunt.file.read('deploy/Ugly.txt');
+            var html = grunt.file.read(deploy_file_name);
 
             var uri = config.auth.server + "/slm/dashboard/changepanelsettings.sp";
             grunt.log.writeln('URI:', uri);
@@ -404,9 +409,11 @@ module.exports = function(grunt) {
     grunt.registerTask('test-fast', "Run tests that don't need to connect to Rally", ['jasmine:fast']);
     grunt.registerTask('test-slow', "Run tests that need to connect to Rally", ['jasmine:slow']);
 
-    grunt.registerTask('test-and-deploy', 'Build and deploy app to the location in auth.json',['test-fast','ugly','install']);
+    grunt.registerTask('test-and-deploy', 'Build and deploy app to the location in auth.json',['test-fast','ugly','install:deploy/Ugly.txt']);
 
-    grunt.registerTask('deploy', 'Build and deploy app to the location in auth.json',['ugly','install']);
+    grunt.registerTask('deploy', 'Build and deploy app to the location in auth.json',['ugly','install:deploy/Ugly.txt']);
 
-    grunt.registerTask('deploy-pretty', 'Build and deploy app to the location in auth.json',['pretty','install']);
+    grunt.registerTask('deploy-pretty', 'Build and deploy app to the location in auth.json',['pretty','install:deploy/App.txt']);
+
+    grunt.registerTask('deploy-debug', 'Build and deploy app to the location in auth.json',['template:debug', 'setPostBuildInfo:deploy/App.txt', 'install:deploy/App.txt']);
 };

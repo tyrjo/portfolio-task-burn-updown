@@ -1,9 +1,6 @@
 Ext.define('Rally.example.CFDCalculator', {
     extend: 'Rally.data.lookback.calculator.TimeSeriesCalculator',
     config: {
-        // stateFieldName: 'ScheduleState',
-        // stateFieldValues: ['Defined', 'In-Progress', 'Completed', 'Accepted'],
-
     },
 
     constructor: function (config) {
@@ -26,17 +23,6 @@ Ext.define('Rally.example.CFDCalculator', {
                 display: 'column'
             }
         ];
-        /*
-        return _.map(this.getStateFieldValues(), function (stateFieldValue) {
-            return {
-                as: stateFieldValue,
-                groupByField: this.getStateFieldName(),
-                allowedValues: [stateFieldValue],
-                f: 'groupByCount',
-                display: 'column'
-            };
-        }, this);
-        */
     }
 });
 
@@ -45,7 +31,8 @@ Ext.define("PTBUD", {
     extend: 'Rally.app.App',
 
     requires: [
-        'Rally.example.CFDCalculator'
+        'Rally.example.CFDCalculator',
+        'Rally.apps.charts.settings.PortfolioItemPicker'
     ],
 
     listeners: {},
@@ -57,12 +44,18 @@ Ext.define("PTBUD", {
     },
 
     getSettingsFields: function () {
-        return this.chartSettings && this.chartSettings.getSettingsConfiguration();
+        return [
+            {
+                xtype: 'chartportfolioitempicker',
+                app: Rally.getApp(),
+                height: 350
+            }
+        ];
     },
 
     _getCurrentStories: function () {
         var deferred = Ext.create('Deft.Deferred');
-        var itemOids = this._getPortfolioItems();
+        var itemOids = this._getPortfolioItems().map(function(item){ return item.oid; });
         Ext.create('Rally.data.lookback.SnapshotStore', {
             listeners: {
                 load: function (store, data, success) {
@@ -112,11 +105,12 @@ Ext.define("PTBUD", {
                     storeConfig: this._getStoreConfig(oids),
                     calculatorType: 'Rally.example.CFDCalculator',
                     calculatorConfig: {
-                        granularity: 'hour'
+                        granularity: 'hour',
+                        startDate: this._getEarliestStartDate(),
+                        endDate: this._getLatestEndDate()
                     },
                     chartConfig: this._getChartConfig()
                 });
-                this._setupChartSettings();
             },
             failure: function (msg) {
                 Ext.Msg.alert(msg);
@@ -124,10 +118,35 @@ Ext.define("PTBUD", {
         });
     },
 
-    _setupChartSettings: function () {
-        this.chartSettings = Ext.create("Rally.apps.charts.rpm.ChartSettings", {
-            app: this
-        });
+    // TODO (tj) Unit tests
+    _getEarliestStartDate: function() {
+        var date = this._getPortfolioItems().reduce(function(accumulator, currentValue){
+            var currentPlannedStartDate = currentValue.PlannedStartDate ? Ext.Date.parse(currentValue.PlannedStartDate, 'c') : new Date();
+            var currentActualStartDate = currentValue.ActualStartDate ? Ext.Date.parse(currentValue.ActualStartDate, 'c') : new Date();
+            var earliestDate = (currentActualStartDate < currentPlannedStartDate) ? currentActualStartDate : currentPlannedStartDate;
+
+            if ( accumulator && accumulator < earliestDate ) {
+                earliestDate = accumulator;
+            }
+
+            return earliestDate;
+
+        }, null);
+        return date;
+    },
+
+    _getLatestEndDate: function() {
+        var date = this._getPortfolioItems().reduce(function(accumulator, currentValue){
+            var latestDate = currentValue.PlannedEndDate ? Ext.Date.parse(currentValue.PlannedEndDate, 'c') : new Date();
+
+            if ( accumulator && accumulator > latestDate ) {
+                latestDate = accumulator;
+            }
+
+            return latestDate;
+
+        }, null);
+        return date;
     },
 
     /**
@@ -154,10 +173,13 @@ Ext.define("PTBUD", {
     },
 
     _getPortfolioItems: function () {
-        var refs = this.getSetting('portfolioItemPicker').split(',');
-        return refs.map(function (ref) {
-            return Rally.util.Ref.getOidFromRef(ref);
-        });
+        var items = [];
+        try {
+            items = JSON.parse(this.getSetting('portfolioItems'));
+        } catch(e) {
+            // ignore failures
+        }
+        return items;
     },
 
     /**
@@ -173,7 +195,7 @@ Ext.define("PTBUD", {
             },
             xAxis: {
                 tickmarkPlacement: 'on',
-                tickInterval: 1,
+                tickInterval: 30,
                 title: {
                     text: 'Date'
                 }
@@ -198,37 +220,3 @@ Ext.define("PTBUD", {
         };
     }
 });
-
-/*
-Ext.define("PTBUD", {
-    extend: 'Rally.app.App',
-
-    launch: function() {
-        var snapshotStore = Ext.create('Rally.data.lookback.SnapshotStore', {
-            fetch: ['Name', 'Project', 'Actuals'],
-            autoLoad: true,
-            filters: [
-                {
-                    property: '_TypeHierarchy', 
-                    value: 'Task'
-                },
-                {
-                    property: 'Actuals',
-                    operator: '>',
-                    value: 0 
-                },
-                {
-                    property: 'Project',
-                    operator: '=',
-                    value: PROJECT_ID
-                },
-            ],
-            listeners: {
-                load: function(store, records) {
-                    console.log(records);
-                }
-            }
-        });
-    }
-});
-*/

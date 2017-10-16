@@ -5,7 +5,9 @@
   "scripts": {
     "debug": "grunt debug",
     "debug:watch": "nodemon --exec grunt debug",
-    "deploy:watch": "nodemon --exec grunt deploy "
+    "deploy:watch": "nodemon --exec grunt deploy",
+    "deploy-pretty:watch": "nodemon --exec grunt deploy-pretty",
+    "deploy-debug:watch": "nodemon --exec grunt deploy-debug"
   },
   "dependencies": {},
   "devDependencies": {

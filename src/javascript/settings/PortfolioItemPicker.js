@@ -5,7 +5,6 @@
         extend: "Ext.form.FieldContainer",
         alias: "widget.chartportfolioitempicker",
 
-        settingsParent: undefined,
         requestContext: undefined,
 
         requires: [
@@ -17,8 +16,7 @@
         ],
 
         mixins: [
-            'Ext.form.field.Field',
-            'Rally.apps.charts.settings.SettingsChangeMixin'
+            'Ext.form.field.Field'
         ],
 
         emptyText: '<p>No portfolio items match your search criteria.</p>',
@@ -59,15 +57,10 @@
             }
         ],
 
-        initComponent: function () {
-            this.callParent(arguments);
-            this._addTestClass();
+        config: {
+            app: undefined
         },
 
-        _addTestClass: function () {
-            this.addCls(Rally.util.Test.toBrowserTestCssClass('buttonChooser'));
-        },
-        
         beforeRender: function () {
             this._configureButton();
             this._configurePicker();
@@ -85,14 +78,14 @@
 
         _setupRequestContext: function () {
             this.requestContext = {
-                workspace: this.settingsParent.app.context.getWorkspaceRef(),
+                workspace: this.app.context.getWorkspaceRef(),
                 project: null
             };
         },
 
         _setValueFromSettings: function () {
-            var newSettingsValue = this.settingsParent.app.getSetting("portfolioItemPicker"),
-                oldSettingsValue = this.settingsParent.app.getSetting("buttonchooser");
+            var newSettingsValue = this.app.getSetting("portfolioItemPicker"),
+                oldSettingsValue = this.app.getSetting("buttonchooser");
 
             if (this._isSettingValid(newSettingsValue)) {
                 this.setValue(newSettingsValue);
@@ -126,7 +119,7 @@
                     };
                 })
             );
-            
+
             Ext.create("Rally.data.wsapi.Store", {
                 model: Ext.identityFn("Portfolio Item"),
                 filters: filters,
@@ -174,14 +167,14 @@
             if ( ! Ext.isArray(this.portfolioItems) ) {
                 this.portfolioItems = [this.portfolioItems];
             }
-            
+
             return Ext.Array.map(this.portfolioItems, function(pi){
                 return {
                     xtype:'button',
                     cls: 'project-button',
                     text: pi.FormattedID + " <span class='icon-delete'></span>",
                     listeners: {
-                        scope: this, 
+                        scope: this,
                         click: function() {
                             this._removeItem(pi);
                         }
@@ -194,55 +187,52 @@
             this.portfolioItems = Ext.Array.filter(this.portfolioItems, function(pi){
                 return ( record.FormattedID != pi.FormattedID );
             });
-            
+
             this.portfolioItemRefs = Ext.Array.map(this.portfolioItems, function(pi) { return pi._ref; });
             this.setValue(this.portfolioItemRefs);
-            this.sendSettingsChange(this.portfolioItems);
 
             this._setDisplayValue();
         },
-        
+
         _onPortfolioItemChosen: function (dialog,resultStore) {
             var items = Ext.Array.merge(resultStore, this.portfolioItems);
-                        
+
             this._handleStoreResults(items);
             this._destroyChooser();
         },
-        
+
         _filterUniquePIs: function(items) {
             var hash = {};
             Ext.Array.each(items, function(item) {
                 var ref = item._ref || item.get('_ref');
                 hash[ref] = item;
             });
-            
+
             return Ext.Object.getValues(hash);
         },
 
         _handleStoreResults: function(store) {
             if (store) {
                 if ( Ext.isArray(store) ) {
-                    var pis = Ext.Array.map(store, function(pi) { 
+                    var pis = Ext.Array.map(store, function(pi) {
                         if ( Ext.isFunction(pi.getData) ) {
                             return pi.getData();
                         }
                         return pi;
                     });
-                    
+
                     this.portfolioItems = this._filterUniquePIs(pis);
-                    
+
                     this.portfolioItemRefs = Ext.Array.map(this.portfolioItems, function(pi) {
                         return pi._ref;
                     });
-                    
+
                     this._setDisplayValue();
                     this.setValue(this.portfolioItemRefs);
-                    this.sendSettingsChange(this.portfolioItems);
                 } else if (store.data) {
                     this.portfolioItem = store.data;
                     this._setDisplayValue();
                     this.setValue(this.portfolioItem._ref);
-                    this.sendSettingsChange(this.portfolioItem);
                 }
             }
         },
@@ -279,7 +269,7 @@
         },
 
         setValue: function (value) {
-            
+
             if (value && value !== "undefined") {
                 if ( Ext.isString(value) ) {
                     value = value.split(',');
@@ -287,7 +277,7 @@
                 this.value = value;
             }
             else {
-                this.value = this.settingsParent.app.getSetting("portfolioItemPicker");
+                this.value = this.app.getSetting("portfolioItemPicker");
             }
         },
 
@@ -296,7 +286,7 @@
 
             if ( this.portfolioItemRefs && Ext.isArray(this.portfolioItemRefs) ) {
                 this.setValue(this.portfolioItemRefs);
-                returnObject.portfolioItemPicker = this.portfolioItemRefs;                
+                returnObject.portfolioItemPicker = this.portfolioItemRefs;
             } else if (this.portfolioItem) {
 
                 this.setValue(this.portfolioItem._ref);
@@ -305,6 +295,16 @@
             else {
                 returnObject.portfolioItemPicker = "";
             }
+
+            returnObject.portfolioItems = JSON.stringify(this.portfolioItems.map(function(item){
+                return {
+                    _ref: item._ref,
+                    oid: Rally.util.Ref.getOidFromRef(item._ref),
+                    PlannedStartDate: item.PlannedStartDate,
+                    ActualStartDate: item.ActualStartDate,
+                    PlannedEndDate: item.PlannedEndDate
+                }
+            }));
 
             return returnObject;
         }

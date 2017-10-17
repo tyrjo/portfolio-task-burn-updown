@@ -4,14 +4,7 @@
   "className": "PTBUD",
   "story": "",
   "javascript": [
-    "src/javascript/DateMixin.js",
-    "src/javascript/settings/SettingsChangeMixin.js",
-    "src/javascript/settings/RadioGroupSetting.js",
     "src/javascript/settings/PortfolioItemPicker.js",
-    "src/javascript/settings/DataTypePicker.js",
-    "src/javascript/settings/PortfolioItemDataTypePicker.js",
-    "src/javascript/settings/PortfolioDatePicker.js",
-    "src/javascript/settings/ChartSettings.js",
     "src/javascript/utils/__ts-info-link.js",
     "src/javascript/utils/__ts-logger.js",
     "src/javascript/app.js"

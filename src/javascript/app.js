@@ -11,6 +11,7 @@ Ext.define('Rally.example.CFDCalculator', {
         this.callParent(arguments);
         this._getCapacityForTick = this._getCapacityForTick.bind(this);
         this._getCapacityBurndownForTick = this._getCapacityBurndownForTick.bind(this);
+        this._continueWhile = this._continueWhile.bind(this);
     },
 
     _getCapacityForTick: function (snapshot, index, metric, seriesData) {
@@ -25,15 +26,32 @@ Ext.define('Rally.example.CFDCalculator', {
         }
 
         if (this.remainingIdealTodo === undefined) {
-            if ( snapshot['To Do'] != undefined) {
+            if (snapshot['To Do'] != undefined) {
                 // Found the first To Do entry for this chart
                 this.remainingIdealTodo = snapshot['To Do'];
             }
         } else {
-            this.remainingIdealTodo = Math.max(this.remainingIdealTodo-priorCapacity, 0);
+            this.remainingIdealTodo = Math.max(this.remainingIdealTodo - priorCapacity, 0);
         }
 
         return this.remainingIdealTodo || 0;
+    },
+
+    _continueWhile: function(point) {
+        return Ext.Date.parse(point.tick, 'c') < this.chartEndDate;
+    },
+
+    getProjectionsConfig: function () {
+        return {
+            continueWhile: this._continueWhile,
+            series: [
+                {
+                    field: 'Total Capacity',
+                    as: "Projection",
+                    display: 'line'
+                }
+            ]
+        };
     },
 
     getDerivedFieldsAfterSummary: function () {
@@ -66,12 +84,6 @@ Ext.define('Rally.example.CFDCalculator', {
                 display: 'column'
             }
         ];
-    },
-
-    getProjectionsConfig: function () {
-        return {
-            limit: 1
-        };
     }
 });
 
@@ -205,8 +217,10 @@ Ext.define("PTBUD", {
                     calculatorConfig: {
                         granularity: 'hour',
                         startDate: this._getEarliestStartDate(),
-                        endDate: this._getLatestEndDate(),
-                        app: this
+                        endDate: new Date(),//this._getLatestEndDate(),
+                        app: this,
+                        enableProjections: true,
+                        chartEndDate: this._getLatestEndDate()
                     },
                     chartConfig: this._getChartConfig()
                 });

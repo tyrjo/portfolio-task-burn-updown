@@ -1,7 +1,10 @@
 Ext.define("com.ca.technicalservices.Burnupdown", {
-    extend: 'Rally.app.App',
+    extend: 'Rally.app.TimeboxScopedApp',
+
+    scopeType: 'release',
 
     requires: [
+        'com.ca.technicalservices.Burnupdown.settings.Utils',
         'com.ca.technicalservices.Burnupdown.IterationData',
         'com.ca.technicalservices.Burnupdown.Calculator',
         'com.ca.technicalservices.Burnupdown.PortfolioItemPicker'
@@ -10,11 +13,34 @@ Ext.define("com.ca.technicalservices.Burnupdown", {
     listeners: {},
 
     iterationData: undefined,
+    settingsUtils: undefined,
 
     config: {
         defaultSettings: {
             portfolioItemPicker: ''
         }
+    },
+
+    onScopeChange: function (scope) {
+        // Get Portfolio Items in the release
+        Ext.create("Rally.data.wsapi.Store", {
+            model: "PortfolioItem/Feature",
+            filters: [scope.getQueryFilter()],
+            context: this.getContext().getDataContext(),
+            autoLoad: true,
+            fetch: ['ObjectID','Name','ActualStartDate','PlannedStartDate','ActualEndDate','PlannedEndDate'],
+            listeners: {
+                scope: this,
+                load: function(store, records, successful, eOpts) {
+                    console.log(records);
+                    var portfolioItems = records.map(function(record){
+                        return record.raw;
+                    });
+                    var piSettings = this.settingsUtils.setPortfolioItems(this, portfolioItems);
+                    this.launch();
+                }
+            }
+        });
     },
 
     getSettingsFields: function () {
@@ -109,6 +135,7 @@ Ext.define("com.ca.technicalservices.Burnupdown", {
     },
 
     launch: function () {
+        this.settingsUtils = Ext.create('com.ca.technicalservices.Burnupdown.settings.Utils');
         this.iterationData = Ext.create('com.ca.technicalservices.Burnupdown.IterationData');
         this._getCurrentStories().then({
             scope: this,
@@ -198,7 +225,7 @@ Ext.define("com.ca.technicalservices.Burnupdown", {
     _getPortfolioItems: function () {
         var items = [];
         try {
-            items = JSON.parse(this.getSetting('portfolioItems'));
+            items = this.settingsUtils.getPortfolioItems(this);
         } catch (e) {
             // ignore failures
         }

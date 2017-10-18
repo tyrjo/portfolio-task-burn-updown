@@ -12,7 +12,9 @@
             'Rally.util.Test',
             'Rally.ui.EmptyTextFactory',
             'Rally.ui.dialog.ChooserDialog',
-            'Rally.data.wsapi.Store'
+            'Rally.data.wsapi.Store',
+            'com.ca.technicalservices.Burnupdown.settings.Utils'
+
         ],
 
         mixins: [
@@ -62,6 +64,7 @@
         },
 
         beforeRender: function () {
+            this.settingsUtils = Ext.create('com.ca.technicalservices.Burnupdown.settings.Utils');
             this._configureButton();
             this._configurePicker();
         },
@@ -296,15 +299,8 @@
                 returnObject.portfolioItemPicker = "";
             }
 
-            returnObject.portfolioItems = JSON.stringify(this.portfolioItems.map(function(item){
-                return {
-                    _ref: item._ref,
-                    oid: Rally.util.Ref.getOidFromRef(item._ref),
-                    PlannedStartDate: item.PlannedStartDate,
-                    ActualStartDate: item.ActualStartDate,
-                    PlannedEndDate: item.PlannedEndDate
-                }
-            }));
+            piSettings = this.settingsUtils.setPortfolioItems(this.app, this.portfolioItems);
+            _.merge(returnObject, piSettings);
 
             return returnObject;
         }

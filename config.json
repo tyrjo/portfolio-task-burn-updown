@@ -4,8 +4,9 @@
   "className": "com.ca.technicalservices.Burnupdown",
   "story": "",
   "javascript": [
-    "src/javascript/Calculator.js",
+    "src/javascript/settings/Utils.js",
     "src/javascript/settings/PortfolioItemPicker.js",
+    "src/javascript/Calculator.js",
     "src/javascript/IterationData.js",
     "src/javascript/utils/__ts-info-link.js",
     "src/javascript/utils/__ts-logger.js",

@@ -4,32 +4,49 @@ Ext.define('Rally.example.CFDCalculator', {
         app: undefined
     },
 
+    remainingIdealTodo: undefined,
+
     constructor: function (config) {
         this.initConfig(config);
         this.callParent(arguments);
         this._getCapacityForTick = this._getCapacityForTick.bind(this);
+        this._getCapacityBurndownForTick = this._getCapacityBurndownForTick.bind(this);
     },
 
     _getCapacityForTick: function (snapshot, index, metric, seriesData) {
-        console.log(this);
-        var date = Ext.Date.parse(snapshot.tick, 'c');
-        this.app.iterations.find(function(element){
-            // TODO (tj) avoid the repeated date parsing
-            if ( date >= Ext.Date.parse(element.StartDate, 'c') &&
-                 date <= Ext.Date.parse(element.EndDate, 'c')) {
-                return true;
-            } else {
-                return false;
-            }
-        }, this);
+        var capacity = this.app.iterationData.getCapacityForDateString(snapshot.tick);
+        return capacity;
     },
 
-    getDerivedFieldsAfterSummary: function() {
+    _getCapacityBurndownForTick: function (snapshot, index, metric, seriesData) {
+        var priorCapacity = 0;
+        if (index > 0 && seriesData[index - 1]['Total Capacity']) {
+            priorCapacity = seriesData[index - 1]['Total Capacity']
+        }
+
+        if (this.remainingIdealTodo === undefined) {
+            if ( snapshot['To Do'] != undefined) {
+                // Found the first To Do entry for this chart
+                this.remainingIdealTodo = snapshot['To Do'];
+            }
+        } else {
+            this.remainingIdealTodo = Math.max(this.remainingIdealTodo-priorCapacity, 0);
+        }
+
+        return this.remainingIdealTodo || 0;
+    },
+
+    getDerivedFieldsAfterSummary: function () {
         return [
             {
                 as: 'Total Capacity',
                 display: 'line',
                 f: this._getCapacityForTick
+            },
+            {
+                as: 'Ideal Capacity Based Burndown',
+                display: 'line',
+                f: this._getCapacityBurndownForTick
             }
         ]
     },
@@ -49,6 +66,12 @@ Ext.define('Rally.example.CFDCalculator', {
                 display: 'column'
             }
         ];
+    },
+
+    getProjectionsConfig: function () {
+        return {
+            limit: 1
+        };
     }
 });
 
@@ -57,20 +80,20 @@ Ext.define("PTBUD", {
     extend: 'Rally.app.App',
 
     requires: [
+        'com.ca.technicalservices.IterationData',
         'Rally.example.CFDCalculator',
         'Rally.apps.charts.settings.PortfolioItemPicker'
     ],
 
     listeners: {},
 
+    iterationData: undefined,
+
     config: {
         defaultSettings: {
             portfolioItemPicker: ''
         }
     },
-
-    iterations: [],
-    iterationCapacityTotals: {},
 
     getSettingsFields: function () {
         return [
@@ -123,6 +146,7 @@ Ext.define("PTBUD", {
         return deferred.promise;
     },
 
+    // TODO (tj) move to IterationData
     _getIterations: function (oids) {
         var deferred = Ext.create('Deft.Deferred');
         Ext.create('Rally.data.wsapi.Store', {
@@ -149,13 +173,9 @@ Ext.define("PTBUD", {
                     if (!success) {
                         deferred.reject("Unable to load iterations");
                     }
-                    var iterationGroups = store.getGroups();
-                    this.iterations = [];
-                    iterationGroups.each(function(group){
-                        this.iterations.push(group.children[0].data.Iteration);
-                    });
 
-                    this.iterationCapacityTotals = store.sum('Capacity', true);
+                    this.iterationData.collectIterations(store);
+
                     deferred.resolve(data.map(function (story) {
                         return story.get('ObjectID');
                     }))
@@ -167,7 +187,7 @@ Ext.define("PTBUD", {
     },
 
     launch: function () {
-
+        this.iterationData = Ext.create('com.ca.technicalservices.IterationData');
         this._getCurrentStories().then({
             scope: this,
             success: function (stories) {

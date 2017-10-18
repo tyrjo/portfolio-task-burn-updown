@@ -1,88 +1,10 @@
-Ext.define('Rally.example.CFDCalculator', {
-    extend: 'Rally.data.lookback.calculator.TimeSeriesCalculator',
-    config: {
-        app: undefined
-    },
-
-    remainingIdealTodo: undefined,
-
-    constructor: function (config) {
-        this.initConfig(config);
-        this.callParent(arguments);
-        this._getCapacityForTick = this._getCapacityForTick.bind(this);
-        this._getCapacityBurndownForTick = this._getCapacityBurndownForTick.bind(this);
-    },
-
-    _getCapacityForTick: function (snapshot, index, metric, seriesData) {
-        var capacity = this.app.iterationData.getCapacityForDateString(snapshot.tick);
-        return capacity;
-    },
-
-    _getCapacityBurndownForTick: function (snapshot, index, metric, seriesData) {
-        var priorCapacity = 0;
-        if (index > 0 && seriesData[index - 1]['Total Capacity']) {
-            priorCapacity = seriesData[index - 1]['Total Capacity']
-        }
-
-        if (this.remainingIdealTodo === undefined) {
-            if ( snapshot['To Do'] != undefined) {
-                // Found the first To Do entry for this chart
-                this.remainingIdealTodo = snapshot['To Do'];
-            }
-        } else {
-            this.remainingIdealTodo = Math.max(this.remainingIdealTodo-priorCapacity, 0);
-        }
-
-        return this.remainingIdealTodo || 0;
-    },
-
-    getDerivedFieldsAfterSummary: function () {
-        return [
-            {
-                as: 'Total Capacity',
-                display: 'line',
-                f: this._getCapacityForTick
-            },
-            {
-                as: 'Ideal Capacity Based Burndown',
-                display: 'line',
-                f: this._getCapacityBurndownForTick
-            }
-        ]
-    },
-
-    getMetrics: function () {
-        return [
-            {
-                field: "TaskRemainingTotal",
-                as: "To Do",
-                f: 'sum',
-                display: 'column'
-            },
-            {
-                field: "TaskActualTotal",
-                as: "Actuals",
-                f: 'sum',
-                display: 'column'
-            }
-        ];
-    },
-
-    getProjectionsConfig: function () {
-        return {
-            limit: 1
-        };
-    }
-});
-
-// TODO (tj) more verbose app class
-Ext.define("PTBUD", {
+Ext.define("com.ca.technicalservices.Burnupdown", {
     extend: 'Rally.app.App',
 
     requires: [
-        'com.ca.technicalservices.IterationData',
-        'Rally.example.CFDCalculator',
-        'Rally.apps.charts.settings.PortfolioItemPicker'
+        'com.ca.technicalservices.Burnupdown.IterationData',
+        'com.ca.technicalservices.Burnupdown.Calculator',
+        'com.ca.technicalservices.Burnupdown.PortfolioItemPicker'
     ],
 
     listeners: {},
@@ -187,7 +109,7 @@ Ext.define("PTBUD", {
     },
 
     launch: function () {
-        this.iterationData = Ext.create('com.ca.technicalservices.IterationData');
+        this.iterationData = Ext.create('com.ca.technicalservices.Burnupdown.IterationData');
         this._getCurrentStories().then({
             scope: this,
             success: function (stories) {
@@ -201,7 +123,7 @@ Ext.define("PTBUD", {
                     xtype: 'rallychart',
                     storeType: 'Rally.data.lookback.SnapshotStore',
                     storeConfig: this._getStoreConfig(oids),
-                    calculatorType: 'Rally.example.CFDCalculator',
+                    calculatorType: 'com.ca.technicalservices.Burnupdown.Calculator',
                     calculatorConfig: {
                         granularity: 'hour',
                         startDate: this._getEarliestStartDate(),

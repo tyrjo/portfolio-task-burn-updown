@@ -1,7 +1,7 @@
 (function () {
     var Ext = window.Ext4 || window.Ext;
 
-    Ext.define("Rally.apps.charts.settings.PortfolioItemPicker", {
+    Ext.define("com.ca.technicalservices.Burnupdown.PortfolioItemPicker", {
         extend: "Ext.form.FieldContainer",
         alias: "widget.chartportfolioitempicker",
 

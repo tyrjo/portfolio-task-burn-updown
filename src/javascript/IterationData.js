@@ -1,7 +1,7 @@
 (function () {
     var Ext = window.Ext4 || window.Ext;
 
-    Ext.define("com.ca.technicalservices.IterationData", {
+    Ext.define("com.ca.technicalservices.Burnupdown.IterationData", {
         alias: "tsiterationdata",
 
         config: {

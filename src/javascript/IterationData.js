@@ -31,12 +31,35 @@
 
                 // add capacity data
                 iteration.capacity = capacityTotals[iteration._ref];
+                iteration.dailyCapacity = iteration.capacity / this.workingDayCount(iteration);
 
                 this.iterations[iteration._ref] = iteration;
             }, this);
         },
 
-        getCapacityForDateString: function(dateString) {
+        workingDayCount: function (iteration) {
+                if ( !iteration.StartDate || ! iteration.EndDate ) {
+                    // Unexpected, I don't think iterations can be missing these dates
+                    Ext.MessageBox.alert("Invalid Iteration", "Iteration " + iteration.Name + " missing StartDate or EndDate");
+                    return undefined;
+                }
+
+                var count = 0;
+                var date = Ext.Date.parse(iteration.StartDate, 'c');
+                var endDate = Ext.Date.parse(iteration.EndDate, 'c');
+                while ( date <= endDate ) {
+                    var day = Ext.Date.format(date, 'l');
+                    // TODO (tj) get workdays from calculator or app
+                    if (_.contains(['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'], day) ) {
+                        count++;
+                    }
+                    date = Ext.Date.add(date, Ext.Date.DAY, 1);
+                }
+                return count;
+        },
+
+        // TODO (tj) use Ext.Date.between
+        getCapacitiesForDateString: function(dateString) {
             var date = Ext.Date.parse(dateString, 'c');
             var iteration = _.find(this.iterations, function(value) {
                 if ( value.StartDate <= date &&
@@ -47,7 +70,10 @@
                 }
             });
 
-            return iteration ? iteration.capacity : 0;
+            return iteration ? {
+                total: iteration.capacity,
+                daily: iteration.dailyCapacity
+            } : 0;
         }
     });
 }());

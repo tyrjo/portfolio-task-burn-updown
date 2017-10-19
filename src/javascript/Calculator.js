@@ -4,6 +4,7 @@
     var METRIC_NAME_TODO = 'To Do';
     var METRIC_NAME_ACTUALS = 'Actuals';
     var METRIC_NAME_TOTAL_CAPACITY = 'Total Capacity';
+    var METRIC_NAME_DAILY_CAPACITY = 'Daily Capacity';
     var METRIC_NAME_IDEAL_CAPACITY_BURNDOWN = 'Ideal Capacity Based Burndown';
 
     Ext.define('com.ca.technicalservices.Burnupdown.Calculator', {
@@ -20,13 +21,15 @@
          */
         metricsAllowedOnFutureDates: [
             METRIC_NAME_TOTAL_CAPACITY,
+            METRIC_NAME_DAILY_CAPACITY,
             METRIC_NAME_IDEAL_CAPACITY_BURNDOWN
         ],
 
         constructor: function (config) {
             this.initConfig(config);
             this.callParent(arguments);
-            this._getCapacityForTick = this._getCapacityForTick.bind(this);
+            this._getTotalCapacityForTick = this._getTotalCapacityForTick.bind(this);
+            this._getDailyCapacityForTick = this._getDailyCapacityForTick.bind(this);
             this._getCapacityBurndownForTick = this._getCapacityBurndownForTick.bind(this);
         },
 
@@ -72,15 +75,20 @@
             return date_index;
         },
 
-        _getCapacityForTick: function (snapshot, index, metric, seriesData) {
-            var capacity = this.app.iterationData.getCapacityForDateString(snapshot.tick);
-            return capacity;
+        _getTotalCapacityForTick: function (snapshot, index, metric, seriesData) {
+            var capacities = this.app.iterationData.getCapacitiesForDateString(snapshot.tick);
+            return capacities.total;
+        },
+
+        _getDailyCapacityForTick: function (snapshot, index, metric, seriesData) {
+            var capacities = this.app.iterationData.getCapacitiesForDateString(snapshot.tick);
+            return capacities.daily;
         },
 
         _getCapacityBurndownForTick: function (snapshot, index, metric, seriesData) {
             var priorCapacity = 0;
-            if (index > 0 && seriesData[index - 1]['Total Capacity']) {
-                priorCapacity = seriesData[index - 1]['Total Capacity']
+            if (index > 0 && seriesData[index - 1][METRIC_NAME_DAILY_CAPACITY]) {
+                priorCapacity = seriesData[index - 1][METRIC_NAME_DAILY_CAPACITY]
             }
 
             if (this.remainingIdealTodo === undefined) {
@@ -100,7 +108,12 @@
                 {
                     as: METRIC_NAME_TOTAL_CAPACITY,
                     display: 'line',
-                    f: this._getCapacityForTick
+                    f: this._getTotalCapacityForTick
+                },
+                {
+                    as: METRIC_NAME_DAILY_CAPACITY,
+                    display: 'line',
+                    f: this._getDailyCapacityForTick
                 },
                 {
                     as: METRIC_NAME_IDEAL_CAPACITY_BURNDOWN,

@@ -1,3 +1,5 @@
+// TODO (tj) use Ext or _ for array functions
+
 Ext.define("com.ca.technicalservices.Burnupdown", {
     extend: 'Rally.app.TimeboxScopedApp',
 
@@ -37,7 +39,7 @@ Ext.define("com.ca.technicalservices.Burnupdown", {
                         return record.raw;
                     });
                     var piSettings = this.settingsUtils.setPortfolioItems(this, portfolioItems);
-                    this.launch();
+                    //this.launch();
                 }
             }
         });

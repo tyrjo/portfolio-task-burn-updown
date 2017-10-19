@@ -5,7 +5,7 @@
         alias: "tssettingsutils",
 
         setPortfolioItems: function (app, portfolioItems) {
-            result = portfolioItems.map(function (item) {
+            var result = portfolioItems.map(function (item) {
                 return {
                     _ref: item._ref,
                     oid: Rally.util.Ref.getOidFromRef(item._ref),
@@ -18,7 +18,9 @@
             result = {
                 portfolioItems: JSON.stringify(result)
             };
-            app.updateSettingsValues(result);
+            app.updateSettingsValues({
+                settings: result,
+            });
             return result;
         },
 

@@ -1,5 +1,15 @@
 // TODO (tj) use Ext or _ for array functions
 // TODO (tj) use Ext.Date.between for date checks
+
+TODO (tj) Next steps
+/**
+ * - convert the app to be a regular app
+ * - use onTimeboxScopeChange to detect page level scope changes
+ * - change settings to have a toggle
+ * -- use page / dashboard level scope
+ * -- select PIs (these PIs are not prepopulated from page level scope
+ */
+
 Ext.define("com.ca.technicalservices.Burnupdown", {
     extend: 'Rally.app.TimeboxScopedApp',
 
@@ -38,7 +48,7 @@ Ext.define("com.ca.technicalservices.Burnupdown", {
                     var portfolioItems = records.map(function(record){
                         return record.raw;
                     });
-                    var piSettings = this.settingsUtils.setPortfolioItems(this, portfolioItems);
+                    //var piSettings = this.settingsUtils.setPortfolioItems(this, portfolioItems);
                     //this.launch();
                 }
             }

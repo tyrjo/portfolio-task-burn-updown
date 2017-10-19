@@ -5,7 +5,7 @@
         alias: "tsiterationdata",
 
         config: {
-            app: undefined
+            workDays: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
         },
 
         iterations: {},
@@ -49,8 +49,7 @@
                 var endDate = Ext.Date.parse(iteration.EndDate, 'c');
                 while ( date <= endDate ) {
                     var day = Ext.Date.format(date, 'l');
-                    // TODO (tj) get workdays from calculator or app
-                    if (_.contains(['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'], day) ) {
+                    if (_.contains(this.workDays, day) ) {
                         count++;
                     }
                     date = Ext.Date.add(date, Ext.Date.DAY, 1);
@@ -58,12 +57,10 @@
                 return count;
         },
 
-        // TODO (tj) use Ext.Date.between
         getCapacitiesForDateString: function(dateString) {
             var date = Ext.Date.parse(dateString, 'c');
             var iteration = _.find(this.iterations, function(value) {
-                if ( value.StartDate <= date &&
-                    value.EndDate >= date ) {
+                if ( Ext.Date.between(date, value.StartDate, value.EndDate ) ) {
                     return true;
                 } else {
                     return false;

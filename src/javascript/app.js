@@ -1,7 +1,7 @@
 // TODO (tj) use Ext or _ for array functions
 // TODO (tj) use Ext.Date.between for date checks
 
-TODO (tj) Next steps
+//TODO (tj) Next steps
 /**
  * - convert the app to be a regular app
  * - use onTimeboxScopeChange to detect page level scope changes

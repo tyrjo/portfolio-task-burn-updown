@@ -25,38 +25,62 @@
 
         items: [
             {
-                xtype: "label",
-                text: "Portfolio Item",
-                cls: "settingsLabel"
-            },
-            {
-                xtype: "container",
-                name: "portfolioItemPicker",
-                layout: {
-                    type: "hbox"
-                },
+                xtype: 'radiogroup',
+                title: 'Scope',
                 items: [
                     {
-
-                        xtype: 'rallybutton',
-                        text: 'Add',
-                        itemId: 'portfolioItemButton',
-                        cls: 'piButton primary small'
+                        boxLabel: 'Select Release',
+                        name: 'scope',
+                        inputValue: 'release'
                     },
                     {
-                        xtype: 'container',
-                        cls: 'piDisplayField',
+                        boxLabel: 'Select Individual Portfolio Items',
+                        name: 'scope',
+                        inputValue: 'individual'
+                    }
+                ]
+            },
+            {
+                xtype: 'fieldset',
+                title: 'Select Release'
+            },
+            {
+                xtype: 'fieldset',
+                title: 'Select Individual Portfolio Items',
+                items: [
+                    {
+                        xtype: "label",
+                        text: "Portfolio Item",
+                    },
+                    {
+                        xtype: "container",
+                        name: "portfolioItemPicker",
+                        layout: {
+                            type: "hbox"
+                        },
                         items: [
                             {
+
+                                xtype: 'rallybutton',
+                                text: 'Add',
+                                itemId: 'portfolioItemButton',
+                            },
+                            {
                                 xtype: 'container',
-                                itemId: 'portfolioItemDisplay',
-                                value: "&nbsp;"
+                                cls: 'piDisplayField',
+                                items: [
+                                    {
+                                        xtype: 'container',
+                                        itemId: 'portfolioItemDisplay',
+                                        value: "&nbsp;"
+                                    }
+                                ]
                             }
+
                         ]
                     }
-
                 ]
-            }
+            },
         ],
 
         config: {
@@ -110,11 +134,11 @@
         },
 
         _createPortfolioItemStore: function () {
-            if ( Ext.isEmpty(this.value) || this.value.length === 0 ) {
+            if (Ext.isEmpty(this.value) || this.value.length === 0) {
                 return;
             }
             var filters = Rally.data.wsapi.Filter.or(
-                Ext.Array.map(this.value,function(pi_ref){
+                Ext.Array.map(this.value, function (pi_ref) {
                     return {
                         property: "ObjectID",
                         operator: "=",
@@ -139,7 +163,7 @@
             return Ext.isArray(this.value) && this.value !== "undefined";
         },
 
-        _onPortfolioItemsRetrieved: function (store,records) {
+        _onPortfolioItemsRetrieved: function (store, records) {
             var storeData = records;
             this._handleStoreResults(storeData);
         },
@@ -164,49 +188,51 @@
         },
 
         _getPortfolioItemDisplay: function () {
-            if ( Ext.isEmpty(this.portfolioItems) ) {
+            if (Ext.isEmpty(this.portfolioItems)) {
                 return;
             }
-            if ( ! Ext.isArray(this.portfolioItems) ) {
+            if (!Ext.isArray(this.portfolioItems)) {
                 this.portfolioItems = [this.portfolioItems];
             }
 
-            return Ext.Array.map(this.portfolioItems, function(pi){
+            return Ext.Array.map(this.portfolioItems, function (pi) {
                 return {
-                    xtype:'button',
+                    xtype: 'button',
                     cls: 'project-button',
                     text: pi.FormattedID + " <span class='icon-delete'></span>",
                     listeners: {
                         scope: this,
-                        click: function() {
+                        click: function () {
                             this._removeItem(pi);
                         }
                     }
                 };
-            },this);
+            }, this);
         },
 
-        _removeItem: function(record) {
-            this.portfolioItems = Ext.Array.filter(this.portfolioItems, function(pi){
+        _removeItem: function (record) {
+            this.portfolioItems = Ext.Array.filter(this.portfolioItems, function (pi) {
                 return ( record.FormattedID != pi.FormattedID );
             });
 
-            this.portfolioItemRefs = Ext.Array.map(this.portfolioItems, function(pi) { return pi._ref; });
+            this.portfolioItemRefs = Ext.Array.map(this.portfolioItems, function (pi) {
+                return pi._ref;
+            });
             this.setValue(this.portfolioItemRefs);
 
             this._setDisplayValue();
         },
 
-        _onPortfolioItemChosen: function (dialog,resultStore) {
+        _onPortfolioItemChosen: function (dialog, resultStore) {
             var items = Ext.Array.merge(resultStore, this.portfolioItems);
 
             this._handleStoreResults(items);
             this._destroyChooser();
         },
 
-        _filterUniquePIs: function(items) {
+        _filterUniquePIs: function (items) {
             var hash = {};
-            Ext.Array.each(items, function(item) {
+            Ext.Array.each(items, function (item) {
                 var ref = item._ref || item.get('_ref');
                 hash[ref] = item;
             });
@@ -214,11 +240,11 @@
             return Ext.Object.getValues(hash);
         },
 
-        _handleStoreResults: function(store) {
+        _handleStoreResults: function (store) {
             if (store) {
-                if ( Ext.isArray(store) ) {
-                    var pis = Ext.Array.map(store, function(pi) {
-                        if ( Ext.isFunction(pi.getData) ) {
+                if (Ext.isArray(store)) {
+                    var pis = Ext.Array.map(store, function (pi) {
+                        if (Ext.isFunction(pi.getData)) {
                             return pi.getData();
                         }
                         return pi;
@@ -226,7 +252,7 @@
 
                     this.portfolioItems = this._filterUniquePIs(pis);
 
-                    this.portfolioItemRefs = Ext.Array.map(this.portfolioItems, function(pi) {
+                    this.portfolioItemRefs = Ext.Array.map(this.portfolioItems, function (pi) {
                         return pi._ref;
                     });
 
@@ -248,7 +274,7 @@
                 title: 'Choose Portfolio Item(s) to Add',
                 closeAction: 'destroy',
                 selectionButtonText: 'Select',
-                _isArtifactEditable: function(record) {
+                _isArtifactEditable: function (record) {
                     return true;
                 },
                 listeners: {
@@ -258,12 +284,12 @@
                 storeConfig: {
                     project: null,
                     context: this.requestContext,
-                    fetch: ['ObjectID','Project','WorkSpace','FormattedID','Name','ActualStartDate','PlannedStartDate','ActualEndDate','PlannedEndDate']
+                    fetch: ['ObjectID', 'Project', 'WorkSpace', 'FormattedID', 'Name', 'ActualStartDate', 'PlannedStartDate', 'ActualEndDate', 'PlannedEndDate']
                 },
                 gridConfig: {
                     viewConfig: {
                         emptyText: Rally.ui.EmptyTextFactory.getEmptyTextFor(this.emptyText),
-                        getRowClass: function(record) {
+                        getRowClass: function (record) {
                             return Rally.util.Test.toBrowserTestCssClass('row', record.getId()) + '';
                         }
                     }
@@ -274,7 +300,7 @@
         setValue: function (value) {
 
             if (value && value !== "undefined") {
-                if ( Ext.isString(value) ) {
+                if (Ext.isString(value)) {
                     value = value.split(',');
                 }
                 this.value = value;
@@ -287,7 +313,7 @@
         getSubmitData: function () {
             var returnObject = {};
 
-            if ( this.portfolioItemRefs && Ext.isArray(this.portfolioItemRefs) ) {
+            if (this.portfolioItemRefs && Ext.isArray(this.portfolioItemRefs)) {
                 this.setValue(this.portfolioItemRefs);
                 returnObject.portfolioItemPicker = this.portfolioItemRefs;
             } else if (this.portfolioItem) {

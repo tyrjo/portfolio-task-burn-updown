@@ -1,9 +1,7 @@
 (function () {
     var Ext = window.Ext4 || window.Ext;
 
-    var SETTING_NAME_SCOPE = 'SCOPE';
-    var SCOPE_INDIVIDUAL_PORTFOLIO_ITEMS = 'SCOPE_INDIVIDUAL_PORTFOLIO_ITEMS';
-    var SCOPE_RELEASE_PORTFOLIO_ITEMS = 'SCOPE_RELEASE_PORTFOLIO_ITEMS';
+    var RELEASE_PICKER_ITEMID = 'RELEASE_PICKER_ITEMID';
     var TITLE_SELECT_RELEASE = 'Select Release';
     var TITLE_SELECT_ITEMS = 'Select Individual Portfolio Items';
 
@@ -19,7 +17,7 @@
             'Rally.ui.EmptyTextFactory',
             'Rally.ui.dialog.ChooserDialog',
             'Rally.data.wsapi.Store',
-            'com.ca.technicalservices.Burnupdown.settings.Utils'
+            'SettingsUtils'
 
         ],
 
@@ -29,6 +27,8 @@
 
         emptyText: '<p>No portfolio items match your search criteria.</p>',
 
+        portfolioItemScope: SettingsUtils.SCOPE_RELEASE_PORTFOLIO_ITEMS,
+
         items: [
             {
                 xtype: 'radiogroup',
@@ -37,25 +37,30 @@
                 items: [
                     {
                         boxLabel: TITLE_SELECT_RELEASE,
-                        name: SETTING_NAME_SCOPE,
-                        inputValue: SCOPE_RELEASE_PORTFOLIO_ITEMS,
+                        name: SettingsUtils.SETTING_NAME_SCOPE,
+                        inputValue: SettingsUtils.SCOPE_RELEASE_PORTFOLIO_ITEMS,
                         checked: true
                     },
                     {
                         boxLabel: TITLE_SELECT_ITEMS,
-                        name: SETTING_NAME_SCOPE,
-                        inputValue: SCOPE_INDIVIDUAL_PORTFOLIO_ITEMS
+                        name: SettingsUtils.SETTING_NAME_SCOPE,
+                        inputValue: SettingsUtils.SCOPE_INDIVIDUAL_PORTFOLIO_ITEMS
                     }
                 ]
             },
             {
                 xtype: 'fieldset',
-                itemId: SCOPE_RELEASE_PORTFOLIO_ITEMS,
-                title: TITLE_SELECT_RELEASE
+                itemId: SettingsUtils.SCOPE_RELEASE_PORTFOLIO_ITEMS,
+                title: TITLE_SELECT_RELEASE,
+                items: [{
+                    xtype: 'rallyreleasecombobox',
+                    itemId: RELEASE_PICKER_ITEMID,
+                    name: SettingsUtils.SETTING_NAME_RELEASE
+                }]
             },
             {
                 xtype: 'fieldset',
-                itemId: SCOPE_INDIVIDUAL_PORTFOLIO_ITEMS,
+                itemId: SettingsUtils.SCOPE_INDIVIDUAL_PORTFOLIO_ITEMS,
                 title: TITLE_SELECT_ITEMS,
                 hidden: true,
                 items: [
@@ -99,8 +104,8 @@
         },
 
         beforeRender: function () {
-            this.settingsUtils = Ext.create('com.ca.technicalservices.Burnupdown.settings.Utils');
             this._configureRadio();
+            this._configureReleasePicker();
             this._configureButton();
             this._configurePicker();
         },
@@ -109,9 +114,13 @@
             this.down('#scopeRadioGroup').on({
                 scope: this,
                 change: function (radioGroup, newValue) {
-                    this._onScopeChange(newValue[SETTING_NAME_SCOPE]);
+                    this._onScopeChange(newValue[SettingsUtils.SETTING_NAME_SCOPE]);
                 }
             });
+        },
+
+        _configureReleasePicker: function() {
+            this.down('#' + RELEASE_PICKER_ITEMID).setValue(SettingsUtils.getRelease())
         },
 
         _configureButton: function () {
@@ -334,31 +343,47 @@
         getSubmitData: function () {
             var returnObject = {};
 
-            if (this.portfolioItemRefs && Ext.isArray(this.portfolioItemRefs)) {
-                this.setValue(this.portfolioItemRefs);
-                returnObject.portfolioItemPicker = this.portfolioItemRefs;
-            } else if (this.portfolioItem) {
+            switch (this.portfolioItemScope) {
+                case SettingsUtils.SCOPE_RELEASE_PORTFOLIO_ITEMS:
+                    //returnObject.portfolioItemScope = this.portfolioItemScope;
+                    break;
+                case SettingsUtils.SCOPE_INDIVIDUAL_PORTFOLIO_ITEMS:
+                default:
+                    if (this.portfolioItemRefs && Ext.isArray(this.portfolioItemRefs)) {
+                        this.setValue(this.portfolioItemRefs);
+                        returnObject.portfolioItemPicker = this.portfolioItemRefs;
+                    } else if (this.portfolioItem) {
 
-                this.setValue(this.portfolioItem._ref);
-                returnObject.portfolioItemPicker = this.portfolioItem._ref;
-            }
-            else {
-                returnObject.portfolioItemPicker = "";
+                        this.setValue(this.portfolioItem._ref);
+                        returnObject.portfolioItemPicker = this.portfolioItem._ref;
+                    }
+                    else {
+                        returnObject.portfolioItemPicker = "";
+                    }
+
+                    piSettings = SettingsUtils.setPortfolioItems(this.portfolioItems);
+
+                    returnObject.portfolioItemScope = this.portfolioItemScope;
+
+                    _.merge(returnObject, piSettings);
+
+                    break;
             }
 
-            piSettings = this.settingsUtils.setPortfolioItems(this.app, this.portfolioItems);
-            _.merge(returnObject, piSettings);
 
             return returnObject;
         },
 
         _onScopeChange: function (newScope) {
-            if ( newScope === SCOPE_RELEASE_PORTFOLIO_ITEMS ) {
-                this.down('#' + SCOPE_INDIVIDUAL_PORTFOLIO_ITEMS).setVisible(false);
-                this.down('#' + SCOPE_RELEASE_PORTFOLIO_ITEMS).setVisible(true);
+            this.portfolioItemScope = newScope;
+            var individualFieldset = this.down('#' + SettingsUtils.SCOPE_INDIVIDUAL_PORTFOLIO_ITEMS);
+            var releaseFieldset = this.down('#' + SettingsUtils.SCOPE_RELEASE_PORTFOLIO_ITEMS);
+            if (newScope === SettingsUtils.SCOPE_RELEASE_PORTFOLIO_ITEMS) {
+                individualFieldset.setDisabled(true).setVisible(false);
+                releaseFieldset.setDisabled(false).setVisible(true);
             } else {
-                this.down('#' + SCOPE_INDIVIDUAL_PORTFOLIO_ITEMS).setVisible(true);
-                this.down('#' + SCOPE_RELEASE_PORTFOLIO_ITEMS).setVisible(false);
+                individualFieldset.setDisabled(false).setVisible(true);
+                releaseFieldset.setDisabled(true).setVisible(false);
             }
         }
     });

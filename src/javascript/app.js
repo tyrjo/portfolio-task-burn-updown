@@ -16,7 +16,7 @@ Ext.define("com.ca.technicalservices.Burnupdown", {
     scopeType: 'release',
 
     requires: [
-        'com.ca.technicalservices.Burnupdown.settings.Utils',
+        'SettingsUtils',
         'com.ca.technicalservices.Burnupdown.IterationData',
         'com.ca.technicalservices.Burnupdown.Calculator',
         'com.ca.technicalservices.Burnupdown.PortfolioItemPicker'
@@ -25,7 +25,6 @@ Ext.define("com.ca.technicalservices.Burnupdown", {
     listeners: {},
 
     iterationData: undefined,
-    settingsUtils: undefined,
 
     config: {
         defaultSettings: {
@@ -40,12 +39,12 @@ Ext.define("com.ca.technicalservices.Burnupdown", {
             filters: [scope.getQueryFilter()],
             context: this.getContext().getDataContext(),
             autoLoad: true,
-            fetch: ['ObjectID','Name','ActualStartDate','PlannedStartDate','ActualEndDate','PlannedEndDate'],
+            fetch: ['ObjectID', 'Name', 'ActualStartDate', 'PlannedStartDate', 'ActualEndDate', 'PlannedEndDate'],
             listeners: {
                 scope: this,
-                load: function(store, records, successful, eOpts) {
+                load: function (store, records, successful, eOpts) {
                     console.log(records);
-                    var portfolioItems = records.map(function(record){
+                    var portfolioItems = records.map(function (record) {
                         return record.raw;
                     });
                     //var piSettings = this.settingsUtils.setPortfolioItems(this, portfolioItems);
@@ -67,31 +66,10 @@ Ext.define("com.ca.technicalservices.Burnupdown", {
 
     _getCurrentStories: function () {
         var deferred = Ext.create('Deft.Deferred');
-        var itemOids = this._getPortfolioItems().map(function (item) {
-            return item.oid;
-        });
         Ext.create('Rally.data.lookback.SnapshotStore', {
             autoLoad: true,
             fetch: ['ObjectID', 'Iteration'],
-            filters: [
-                {
-                    property: '_ItemHierarchy',
-                    operator: 'in',
-                    value: itemOids
-                },
-                {
-                    property: '_TypeHierarchy',
-                    value: 'HierarchicalRequirement'
-                },
-                {
-                    property: 'Children',
-                    value: null
-                },
-                {
-                    property: '__At',
-                    value: 'current'
-                }
-            ],
+            filters: this._getLookbackFilters(),
             listeners: {
                 load: function (store, data, success) {
                     if (!success) {
@@ -104,6 +82,58 @@ Ext.define("com.ca.technicalservices.Burnupdown", {
         });
 
         return deferred.promise;
+    },
+
+    _getLookbackFilters: function () {
+        var filters = [
+            /*
+            {
+                property: '_ItemHierarchy',
+                operator: 'in',
+                value: itemOids
+            },
+            */
+            {
+                property: '_TypeHierarchy',
+                value: 'HierarchicalRequirement'
+            },
+            {
+                property: 'Children',
+                value: null
+            },
+            {
+                property: '__At',
+                value: 'current'
+            }
+        ];
+
+        if (this._isReleaseScope()) {
+            // User has selected a release. Filter out stories not in that release.
+            filters.push({
+                property: 'Release',
+                value: this._getSelectedRelease()
+            });
+        } else {
+            // User has selected individual portfolio items. Filter out stories
+            // not in those PIs
+            var itemOids = this._getPortfolioItems().map(function (item) {
+                return item.oid;
+            });
+            filters.push({
+                property: '_ItemHierarchy',
+                operator: 'in',
+                value: itemOids
+            });
+        }
+        return filters;
+    },
+
+    _isReleaseScope: function () {
+        return this.getSetting(SettingsUtils.SETTING_NAME_SCOPE) === SettingsUtils.SCOPE_RELEASE_PORTFOLIO_ITEMS;
+    },
+
+    _getSelectedRelease: function () {
+      return Rally.util.Ref.getOidFromRef(SettingsUtils.getRelease());
     },
 
     // TODO (tj) move to IterationData
@@ -147,7 +177,6 @@ Ext.define("com.ca.technicalservices.Burnupdown", {
     },
 
     launch: function () {
-        this.settingsUtils = Ext.create('com.ca.technicalservices.Burnupdown.settings.Utils');
         this.iterationData = Ext.create('com.ca.technicalservices.Burnupdown.IterationData');
         this._getCurrentStories().then({
             scope: this,
@@ -237,7 +266,7 @@ Ext.define("com.ca.technicalservices.Burnupdown", {
     _getPortfolioItems: function () {
         var items = [];
         try {
-            items = this.settingsUtils.getPortfolioItems(this);
+            items = SettingsUtils.getPortfolioItems();
         } catch (e) {
             // ignore failures
         }

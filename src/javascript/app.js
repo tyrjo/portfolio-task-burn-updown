@@ -84,15 +84,34 @@ Ext.define("com.ca.technicalservices.Burnupdown", {
         return deferred.promise;
     },
 
+    _getFeatures: function () {
+        var deferred = Ext.create('Deft.Deferred');
+        Ext.create('Rally.data.wsapi.Store', {
+            autoLoad: true,
+            model: 'PortfolioItem/Feature',
+            fetch: ['ObjectID', 'Name'],
+            filters: [
+                {
+                    property: 'Release',
+                    value: null // TODO (tj)
+                }
+            ],
+            listeners: {
+                scope: this,
+                load: function (store, data, success) {
+                    if (!success) {
+                        deferred.reject("Unable to load features");
+                    }
+
+                    deferred.resolve(data);
+                }
+            }
+        });
+        return deferred.promise;
+    },
+
     _getLookbackFilters: function () {
         var filters = [
-            /*
-            {
-                property: '_ItemHierarchy',
-                operator: 'in',
-                value: itemOids
-            },
-            */
             {
                 property: '_TypeHierarchy',
                 value: 'HierarchicalRequirement'
@@ -133,11 +152,12 @@ Ext.define("com.ca.technicalservices.Burnupdown", {
     },
 
     _getSelectedRelease: function () {
-      return Rally.util.Ref.getOidFromRef(SettingsUtils.getRelease());
+        return Rally.util.Ref.getOidFromRef(SettingsUtils.getRelease());
     },
 
     // TODO (tj) move to IterationData
     _getIterations: function (oids) {
+        var iterationData = Ext.create('com.ca.technicalservices.Burnupdown.IterationData');
         var deferred = Ext.create('Deft.Deferred');
         Ext.create('Rally.data.wsapi.Store', {
             autoLoad: true,
@@ -163,12 +183,8 @@ Ext.define("com.ca.technicalservices.Burnupdown", {
                     if (!success) {
                         deferred.reject("Unable to load iterations");
                     }
-
-                    this.iterationData.collectIterations(store);
-
-                    deferred.resolve(data.map(function (story) {
-                        return story.get('ObjectID');
-                    }))
+                    iterationData.collectIterations(store);
+                    deferred.resolve(iterationData);
                 }
             }
         });
@@ -177,7 +193,6 @@ Ext.define("com.ca.technicalservices.Burnupdown", {
     },
 
     launch: function () {
-        this.iterationData = Ext.create('com.ca.technicalservices.Burnupdown.IterationData');
         this._getCurrentStories().then({
             scope: this,
             success: function (stories) {
@@ -187,20 +202,24 @@ Ext.define("com.ca.technicalservices.Burnupdown", {
                 var iterationOids = stories.map(function (story) {
                     return story.get('Iteration');
                 });
-                this.add({
-                    xtype: 'rallychart',
-                    storeType: 'Rally.data.lookback.SnapshotStore',
-                    storeConfig: this._getStoreConfig(oids),
-                    calculatorType: 'com.ca.technicalservices.Burnupdown.Calculator',
-                    calculatorConfig: {
-                        granularity: 'hour',
-                        startDate: this._getEarliestStartDate(),
-                        endDate: this._getLatestEndDate(),
-                        app: this
-                    },
-                    chartConfig: this._getChartConfig()
+                this._getIterations(iterationOids).then({
+                    scope: this,
+                    success: function (iterationData) {
+                        this.add({
+                            xtype: 'rallychart',
+                            storeType: 'Rally.data.lookback.SnapshotStore',
+                            storeConfig: this._getStoreConfig(oids),
+                            calculatorType: 'com.ca.technicalservices.Burnupdown.Calculator',
+                            calculatorConfig: {
+                                granularity: 'hour',
+                                startDate: this._getEarliestStartDate(),
+                                endDate: this._getLatestEndDate(),
+                                iterationData: iterationData
+                            },
+                            chartConfig: this._getChartConfig()
+                        });
+                    }
                 });
-                this._getIterations(iterationOids);
             },
             failure: function (msg) {
                 Ext.Msg.alert(msg);
@@ -304,7 +323,7 @@ Ext.define("com.ca.technicalservices.Burnupdown", {
                         enabled: false
                     }
                 },
-                area: {
+                column: {
                     stacking: 'normal'
                 }
             }

@@ -10,7 +10,7 @@
     Ext.define('com.ca.technicalservices.Burnupdown.Calculator', {
         extend: 'Rally.data.lookback.calculator.TimeSeriesCalculator',
         config: {
-            app: undefined
+            iterationData: undefined
         },
 
         remainingIdealTodo: undefined,
@@ -24,6 +24,8 @@
             METRIC_NAME_DAILY_CAPACITY,
             METRIC_NAME_IDEAL_CAPACITY_BURNDOWN
         ],
+
+        features: ['A', 'B'],
 
         constructor: function (config) {
             this.initConfig(config);
@@ -39,7 +41,13 @@
 
         runCalculation: function (snapshots) {
             var result = this.callParent(arguments);
-            return this._nullFutureData(result);
+            result = this._nullFutureData(result);
+            _.each(result.series, function(series){
+                if ( _.contains(this.features, series.name) ) {
+                    series.stack = 'feature'
+                }
+            }, this);
+            return result;
         },
 
         _nullFutureData: function (data) {
@@ -76,12 +84,12 @@
         },
 
         _getTotalCapacityForTick: function (snapshot, index, metric, seriesData) {
-            var capacities = this.app.iterationData.getCapacitiesForDateString(snapshot.tick);
+            var capacities = this.iterationData.getCapacitiesForDateString(snapshot.tick);
             return capacities.total;
         },
 
         _getDailyCapacityForTick: function (snapshot, index, metric, seriesData) {
-            var capacities = this.app.iterationData.getCapacitiesForDateString(snapshot.tick);
+            var capacities = this.iterationData.getCapacitiesForDateString(snapshot.tick);
             return capacities.daily;
         },
 
@@ -101,6 +109,23 @@
             }
 
             return this.remainingIdealTodo || 0;
+        },
+
+        getDerivedFieldsOnInput: function () {
+            var self = this;
+            return _.map(this.features, function (feature) {
+                return {
+                    as: feature,
+                    display: 'column',
+                    f: function (snapshot) {
+                        return self._getDataForFeature(feature, snapshot);
+                    }
+                }
+            }, this);
+        },
+
+        _getDataForFeature: function (feature, snapshot) {
+            return 100;
         },
 
         getDerivedFieldsAfterSummary: function () {
@@ -124,6 +149,22 @@
         },
 
         getMetrics: function () {
+            var metrics = _.map(this.features, function (feature) {
+                return {
+                    field: feature,
+                    as: feature,
+                    f: 'sum',
+                    display: 'column'
+                }
+            }, this);
+            metrics.push({
+                field: "TaskActualTotal",
+                as: METRIC_NAME_ACTUALS,
+                f: 'sum',
+                display: 'column'
+            });
+            return metrics;
+            /*
             return [
                 {
                     field: "TaskRemainingTotal",
@@ -138,6 +179,7 @@
                     display: 'column'
                 }
             ];
+            */
         },
 
         getProjectionsConfig: function () {

@@ -100,7 +100,7 @@
         ],
 
         config: {
-            app: undefined
+            iterationData: undefined
         },
 
         beforeRender: function () {
@@ -135,14 +135,14 @@
 
         _setupRequestContext: function () {
             this.requestContext = {
-                workspace: this.app.context.getWorkspaceRef(),
+                workspace: Rally.getApp().context.getWorkspaceRef(),
                 project: null
             };
         },
 
         _setValueFromSettings: function () {
-            var newSettingsValue = this.app.getSetting("portfolioItemPicker"),
-                oldSettingsValue = this.app.getSetting("buttonchooser");
+            var newSettingsValue = Rally.getApp().getSetting("portfolioItemPicker"),
+                oldSettingsValue = Rally.getApp().getSetting("buttonchooser");
 
             if (this._isSettingValid(newSettingsValue)) {
                 this.setValue(newSettingsValue);
@@ -336,7 +336,7 @@
                 this.value = value;
             }
             else {
-                this.value = this.app.getSetting("portfolioItemPicker");
+                this.value = Rally.getApp().getSetting("portfolioItemPicker");
             }
         },
 

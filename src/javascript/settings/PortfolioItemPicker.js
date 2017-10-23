@@ -1,6 +1,12 @@
 (function () {
     var Ext = window.Ext4 || window.Ext;
 
+    var SETTING_NAME_SCOPE = 'SCOPE';
+    var SCOPE_INDIVIDUAL_PORTFOLIO_ITEMS = 'SCOPE_INDIVIDUAL_PORTFOLIO_ITEMS';
+    var SCOPE_RELEASE_PORTFOLIO_ITEMS = 'SCOPE_RELEASE_PORTFOLIO_ITEMS';
+    var TITLE_SELECT_RELEASE = 'Select Release';
+    var TITLE_SELECT_ITEMS = 'Select Individual Portfolio Items';
+
     Ext.define("com.ca.technicalservices.Burnupdown.PortfolioItemPicker", {
         extend: "Ext.form.FieldContainer",
         alias: "widget.chartportfolioitempicker",
@@ -27,26 +33,31 @@
             {
                 xtype: 'radiogroup',
                 title: 'Scope',
+                itemId: 'scopeRadioGroup',
                 items: [
                     {
-                        boxLabel: 'Select Release',
-                        name: 'scope',
-                        inputValue: 'release'
+                        boxLabel: TITLE_SELECT_RELEASE,
+                        name: SETTING_NAME_SCOPE,
+                        inputValue: SCOPE_RELEASE_PORTFOLIO_ITEMS,
+                        checked: true
                     },
                     {
-                        boxLabel: 'Select Individual Portfolio Items',
-                        name: 'scope',
-                        inputValue: 'individual'
+                        boxLabel: TITLE_SELECT_ITEMS,
+                        name: SETTING_NAME_SCOPE,
+                        inputValue: SCOPE_INDIVIDUAL_PORTFOLIO_ITEMS
                     }
                 ]
             },
             {
                 xtype: 'fieldset',
-                title: 'Select Release'
+                itemId: SCOPE_RELEASE_PORTFOLIO_ITEMS,
+                title: TITLE_SELECT_RELEASE
             },
             {
                 xtype: 'fieldset',
-                title: 'Select Individual Portfolio Items',
+                itemId: SCOPE_INDIVIDUAL_PORTFOLIO_ITEMS,
+                title: TITLE_SELECT_ITEMS,
+                hidden: true,
                 items: [
                     {
                         xtype: "label",
@@ -80,7 +91,7 @@
                         ]
                     }
                 ]
-            },
+            }
         ],
 
         config: {
@@ -89,8 +100,18 @@
 
         beforeRender: function () {
             this.settingsUtils = Ext.create('com.ca.technicalservices.Burnupdown.settings.Utils');
+            this._configureRadio();
             this._configureButton();
             this._configurePicker();
+        },
+
+        _configureRadio: function () {
+            this.down('#scopeRadioGroup').on({
+                scope: this,
+                change: function (radioGroup, newValue) {
+                    this._onScopeChange(newValue[SETTING_NAME_SCOPE]);
+                }
+            });
         },
 
         _configureButton: function () {
@@ -329,6 +350,16 @@
             _.merge(returnObject, piSettings);
 
             return returnObject;
+        },
+
+        _onScopeChange: function (newScope) {
+            if ( newScope === SCOPE_RELEASE_PORTFOLIO_ITEMS ) {
+                this.down('#' + SCOPE_INDIVIDUAL_PORTFOLIO_ITEMS).setVisible(false);
+                this.down('#' + SCOPE_RELEASE_PORTFOLIO_ITEMS).setVisible(true);
+            } else {
+                this.down('#' + SCOPE_INDIVIDUAL_PORTFOLIO_ITEMS).setVisible(true);
+                this.down('#' + SCOPE_RELEASE_PORTFOLIO_ITEMS).setVisible(false);
+            }
         }
     });
 }());

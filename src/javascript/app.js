@@ -84,7 +84,7 @@ Ext.define("com.ca.technicalservices.Burnupdown", {
         return deferred.promise;
     },
 
-    _getFeatures: function () {
+    _getFeatures: function (release) {
         var deferred = Ext.create('Deft.Deferred');
         Ext.create('Rally.data.wsapi.Store', {
             autoLoad: true,
@@ -93,7 +93,7 @@ Ext.define("com.ca.technicalservices.Burnupdown", {
             filters: [
                 {
                     property: 'Release',
-                    value: null // TODO (tj)
+                    value: release
                 }
             ],
             listeners: {
@@ -193,38 +193,57 @@ Ext.define("com.ca.technicalservices.Burnupdown", {
     },
 
     launch: function () {
-        this._getCurrentStories().then({
-            scope: this,
-            success: function (stories) {
-                var oids = stories.map(function (story) {
-                    return story.get('ObjectID');
-                });
-                var iterationOids = stories.map(function (story) {
-                    return story.get('Iteration');
-                });
-                this._getIterations(iterationOids).then({
-                    scope: this,
-                    success: function (iterationData) {
-                        this.add({
-                            xtype: 'rallychart',
-                            storeType: 'Rally.data.lookback.SnapshotStore',
-                            storeConfig: this._getStoreConfig(oids),
-                            calculatorType: 'com.ca.technicalservices.Burnupdown.Calculator',
-                            calculatorConfig: {
-                                granularity: 'hour',
-                                startDate: this._getEarliestStartDate(),
-                                endDate: this._getLatestEndDate(),
-                                iterationData: iterationData
-                            },
-                            chartConfig: this._getChartConfig()
-                        });
-                    }
-                });
-            },
-            failure: function (msg) {
-                Ext.Msg.alert(msg);
-            }
-        });
+        // TODO (tj) support individual PIs
+        // TODO (tj) run calls in parallel
+        var features, stories;
+        this._getFeatures(SettingsUtils.getRelease())
+            .then({
+                scope: this,
+                success: function (data) {
+                    features = _.map(data, function (item) {
+                        return item.raw;
+                    });
+                    return this._getCurrentStories();
+                },
+                failure: function (msg) {
+                    Ext.Msg.alert(msg);
+                }
+            })
+            .then({
+                scope: this,
+                success: function (storiesData) {
+                    stories = storiesData;
+                    var iterationOids = stories.map(function (story) {
+                        return story.get('Iteration');
+                    });
+                    return this._getIterations(iterationOids);
+                },
+                failure: function (msg) {
+                    Ext.Msg.alert(msg);
+                }
+            })
+            .then({
+                scope: this,
+                success: function (iterationData) {
+                    var storyOids = stories.map(function (story) {
+                        return story.get('ObjectID');
+                    });
+                    this.add({
+                        xtype: 'rallychart',
+                        storeType: 'Rally.data.lookback.SnapshotStore',
+                        storeConfig: this._getStoreConfig(storyOids),
+                        calculatorType: 'com.ca.technicalservices.Burnupdown.Calculator',
+                        calculatorConfig: {
+                            granularity: 'hour',
+                            startDate: this._getEarliestStartDate(),
+                            endDate: this._getLatestEndDate(),
+                            iterationData: iterationData,
+                            features: features
+                        },
+                        chartConfig: this._getChartConfig()
+                    });
+                }
+            });
     },
 
     // TODO (tj) Unit tests
@@ -273,7 +292,7 @@ Ext.define("com.ca.technicalservices.Burnupdown", {
                 //_ValidFrom: { '$gt': Rally.util.DateTime.toIsoString(Rally.util.DateTime.add(new Date(), 'day', -30)) }
                 _ValidFrom: {'$lt': Rally.util.DateTime.toIsoString(new Date())}
             },
-            fetch: ['Name', 'TaskEstimateTotal', 'TaskActualTotal', 'TaskRemainingTotal'],
+            fetch: ['Name', 'TaskEstimateTotal', 'TaskActualTotal', 'TaskRemainingTotal', 'Feature'],
             sort: {
                 _ValidFrom: 1
             },

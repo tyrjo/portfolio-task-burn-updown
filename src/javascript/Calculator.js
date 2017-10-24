@@ -25,7 +25,7 @@
             METRIC_NAME_IDEAL_CAPACITY_BURNDOWN
         ],
 
-        features: ['A', 'B'],
+        features: undefined,
 
         constructor: function (config) {
             this.initConfig(config);
@@ -42,9 +42,11 @@
         runCalculation: function (snapshots) {
             var result = this.callParent(arguments);
             result = this._nullFutureData(result);
+            // TODO (tj) handle features of same name
+            var featureNames =_.groupBy(this.features, 'Name');
             _.each(result.series, function(series){
-                if ( _.contains(this.features, series.name) ) {
-                    series.stack = 'feature'
+                if ( featureNames.hasOwnProperty(series.name) ) {
+                    series.stack = 'feature';
                 }
             }, this);
             return result;
@@ -115,7 +117,7 @@
             var self = this;
             return _.map(this.features, function (feature) {
                 return {
-                    as: feature,
+                    as: feature.Name,
                     display: 'column',
                     f: function (snapshot) {
                         return self._getDataForFeature(feature, snapshot);
@@ -125,7 +127,11 @@
         },
 
         _getDataForFeature: function (feature, snapshot) {
-            return 100;
+            if ( snapshot.Feature === feature.ObjectID ) {
+                return snapshot.TaskRemainingTotal;
+            } else {
+                return 0;
+            }
         },
 
         getDerivedFieldsAfterSummary: function () {
@@ -151,8 +157,8 @@
         getMetrics: function () {
             var metrics = _.map(this.features, function (feature) {
                 return {
-                    field: feature,
-                    as: feature,
+                    field: feature.Name,
+                    as: feature.Name,
                     f: 'sum',
                     display: 'column'
                 }

@@ -43,10 +43,14 @@
             var result = this.callParent(arguments);
             result = this._nullFutureData(result);
             // TODO (tj) handle features of same name
-            var featureNames =_.groupBy(this.features, 'Name');
+            var metricNames = {};
+            _.each(this.features, function(feature) {
+                metricNames[feature.Name + " To Do"] = "To Do";
+                metricNames[feature.Name + " Actual"] = "Actual";
+            });
             _.each(result.series, function(series){
-                if ( featureNames.hasOwnProperty(series.name) ) {
-                    series.stack = 'feature';
+                if ( metricNames.hasOwnProperty(series.name) ) {
+                    series.stack = metricNames[series.name];
                 }
             }, this);
             return result;
@@ -115,20 +119,29 @@
 
         getDerivedFieldsOnInput: function () {
             var self = this;
-            return _.map(this.features, function (feature) {
-                return {
-                    as: feature.Name,
+            var fields = [];
+            _.forEach(this.features, function (feature) {
+                fields.push({
+                    as: feature.Name + " To Do",
                     display: 'column',
                     f: function (snapshot) {
-                        return self._getDataForFeature(feature, snapshot);
+                        return self._getDataForFeature(feature, snapshot, 'TaskRemainingTotal');
                     }
-                }
+                });
+                fields.push({
+                    as: feature.Name + " Actual",
+                    display: 'column',
+                    f: function (snapshot) {
+                        return self._getDataForFeature(feature, snapshot, 'TaskActualTotal');
+                    }
+                });
             }, this);
+            return fields;
         },
 
-        _getDataForFeature: function (feature, snapshot) {
+        _getDataForFeature: function (feature, snapshot, attribute) {
             if ( snapshot.Feature === feature.ObjectID ) {
-                return snapshot.TaskRemainingTotal;
+                return snapshot[attribute];
             } else {
                 return 0;
             }
@@ -155,14 +168,23 @@
         },
 
         getMetrics: function () {
-            var metrics = _.map(this.features, function (feature) {
-                return {
-                    field: feature.Name,
-                    as: feature.Name,
+            var metrics = [];
+            _.each(this.features, function (feature) {
+                metrics.push({
+                    field: feature.Name + " To Do",
+                    as: feature.Name + " To Do",
                     f: 'sum',
                     display: 'column'
-                }
-            }, this);
+                });
+                metrics.push({
+                    field: feature.Name + " Actual",
+                    as: feature.Name + " Actual",
+                    f: 'sum',
+                    display: 'column'
+                })
+            });
+            return metrics;
+            /*
             metrics.push({
                 field: "TaskActualTotal",
                 as: METRIC_NAME_ACTUALS,

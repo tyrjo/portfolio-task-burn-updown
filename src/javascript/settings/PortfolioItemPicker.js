@@ -111,15 +111,19 @@
         },
 
         _configureRadio: function () {
-            this.down('#scopeRadioGroup').on({
+            var currentSetting = {};
+            currentSetting[SettingsUtils.SETTING_NAME_SCOPE] = SettingsUtils.getScope();
+            var radioGroup = this.down('#scopeRadioGroup');
+            radioGroup.on({
                 scope: this,
                 change: function (radioGroup, newValue) {
                     this._onScopeChange(newValue[SettingsUtils.SETTING_NAME_SCOPE]);
                 }
             });
+            radioGroup.setValue(currentSetting);
         },
 
-        _configureReleasePicker: function() {
+        _configureReleasePicker: function () {
             this.down('#' + RELEASE_PICKER_ITEMID).setValue(SettingsUtils.getRelease())
         },
 

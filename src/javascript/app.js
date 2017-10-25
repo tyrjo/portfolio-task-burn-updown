@@ -3,11 +3,13 @@
 
 //TODO (tj) Next steps
 /**
- * - convert the app to be a regular app
- * - use onTimeboxScopeChange to detect page level scope changes
- * - change settings to have a toggle
- * -- use page / dashboard level scope
- * -- select PIs (these PIs are not prepopulated from page level scope
+ * Manual tests
+ * Select Theme with child Initiatives, Features and Stories
+ * Select Initiative with child Features and Stories
+ * Select Feature with child Stories
+ * Select Portfolio Item with no direct children
+ * Select Portfolio Item with no decendent Stories
+ * Select Portfolio Items with mix of decendent Stories and no decendent
  */
 
 Ext.define("com.ca.technicalservices.Burnupdown", {
@@ -32,28 +34,6 @@ Ext.define("com.ca.technicalservices.Burnupdown", {
         }
     },
 
-    onScopeChange: function (scope) {
-        // Get Portfolio Items in the release
-        Ext.create("Rally.data.wsapi.Store", {
-            model: "PortfolioItem/Feature",
-            filters: [scope.getQueryFilter()],
-            context: this.getContext().getDataContext(),
-            autoLoad: true,
-            fetch: ['ObjectID', 'Name', 'ActualStartDate', 'PlannedStartDate', 'ActualEndDate', 'PlannedEndDate'],
-            listeners: {
-                scope: this,
-                load: function (store, records, successful, eOpts) {
-                    console.log(records);
-                    var portfolioItems = records.map(function (record) {
-                        return record.raw;
-                    });
-                    //var piSettings = this.settingsUtils.setPortfolioItems(this, portfolioItems);
-                    //this.launch();
-                }
-            }
-        });
-    },
-
     getSettingsFields: function () {
         return [
             {
@@ -66,10 +46,43 @@ Ext.define("com.ca.technicalservices.Burnupdown", {
 
     _getCurrentStories: function () {
         var deferred = Ext.create('Deft.Deferred');
+        var filters = [
+            {
+                property: '_TypeHierarchy',
+                value: 'HierarchicalRequirement'
+            },
+            {
+                property: 'Children',
+                value: null
+            },
+            {
+                property: '__At',
+                value: 'current'
+            }
+        ];
+
+        if (SettingsUtils.isReleaseScope()) {
+            // User has selected a release. Filter out stories not in that release.
+            filters.push({
+                property: 'Release',
+                value: SettingsUtils.getSelectedRelease()
+            });
+        } else {
+            // User has selected individual portfolio items. Filter out stories
+            // not in those PIs
+            var itemOids = this._getPortfolioItems().map(function (item) {
+                return item.oid;
+            });
+            filters.push({
+                property: '_ItemHierarchy',
+                operator: 'in',
+                value: itemOids
+            });
+        }
         Ext.create('Rally.data.lookback.SnapshotStore', {
             autoLoad: true,
             fetch: ['ObjectID', 'Iteration'],
-            filters: this._getLookbackFilters(),
+            filters: filters,
             listeners: {
                 load: function (store, data, success) {
                     if (!success) {
@@ -84,7 +97,28 @@ Ext.define("com.ca.technicalservices.Burnupdown", {
         return deferred.promise;
     },
 
-    _getFeatures: function (release) {
+    _getFeatures: function () {
+        var promise;
+        if (SettingsUtils.isReleaseScope()) {
+            promise = this._getFeaturesFromRelease(SettingsUtils.getRelease());
+        } else {
+            promise = this._getFeaturesFromPis(SettingsUtils.getPortfolioItems());
+        }
+        return promise.then({
+            scope: this,
+            success: function (data) {
+                return _.map(data, function (item) {
+                    return item.raw;
+                });
+            },
+            failure: function (msg) {
+                Ext.Msg.alert(msg);
+            }
+        })
+
+    },
+
+    _getFeaturesFromRelease: function (release) {
         var deferred = Ext.create('Deft.Deferred');
         Ext.create('Rally.data.wsapi.Store', {
             autoLoad: true,
@@ -110,140 +144,147 @@ Ext.define("com.ca.technicalservices.Burnupdown", {
         return deferred.promise;
     },
 
-    _getLookbackFilters: function () {
+    // Only works for feature PIs
+    _getFeaturesFromPis: function (portfolioItems) {
+        portfolioOids = _.map(portfolioItems, function (item) {
+            return item.oid;
+        });
+        var deferred = Ext.create('Deft.Deferred');
+        var oidsFilter = Rally.data.wsapi.Filter.or(_.map(portfolioOids, function (oid) {
+            return {
+                property: 'ObjectID',
+                value: oid
+            }
+        }));
+        var childFilter = Rally.data.wsapi.Filter.or(_.map(portfolioOids, function (oid) {
+            return {
+                property: 'Parent',
+                value: oid
+            }
+        }));
         var filters = [
             {
                 property: '_TypeHierarchy',
-                value: 'HierarchicalRequirement'
-            },
-            {
-                property: 'Children',
-                value: null
+                value: 'PortfolioItem/Feature'
             },
             {
                 property: '__At',
                 value: 'current'
+            },
+            {
+                property: '_ItemHierarchy',
+                operator: 'in',
+                value: portfolioOids
             }
         ];
 
-        if (this._isReleaseScope()) {
-            // User has selected a release. Filter out stories not in that release.
-            filters.push({
-                property: 'Release',
-                value: this._getSelectedRelease()
-            });
-        } else {
-            // User has selected individual portfolio items. Filter out stories
-            // not in those PIs
-            var itemOids = this._getPortfolioItems().map(function (item) {
-                return item.oid;
-            });
-            filters.push({
-                property: '_ItemHierarchy',
-                operator: 'in',
-                value: itemOids
-            });
-        }
-        return filters;
+        // User has selected individual portfolio items. Filter out features
+        // not in those PIs
+
+        Ext.create('Rally.data.lookback.SnapshotStore', {
+            autoLoad: true,
+            fetch: ['ObjectID', 'Name'],
+            filters: filters,
+            listeners: {
+                load: function (store, data, success) {
+                    if (!success) {
+                        deferred.reject("Unable to load features");
+                    }
+
+                    deferred.resolve(data);
+                }
+            },
+        });
+        return deferred.promise;
     },
 
-    _isReleaseScope: function () {
-        return this.getSetting(SettingsUtils.SETTING_NAME_SCOPE) === SettingsUtils.SCOPE_RELEASE_PORTFOLIO_ITEMS;
-    },
-
-    _getSelectedRelease: function () {
-        return Rally.util.Ref.getOidFromRef(SettingsUtils.getRelease());
-    },
 
     // TODO (tj) move to IterationData
     _getIterations: function (oids) {
         var iterationData = Ext.create('com.ca.technicalservices.Burnupdown.IterationData');
         var deferred = Ext.create('Deft.Deferred');
-        Ext.create('Rally.data.wsapi.Store', {
-            autoLoad: true,
-            model: 'UserIterationCapacity',
-            fetch: ['Capacity', 'User', 'Iteration', 'StartDate', 'EndDate'],
-            groupField: 'Iteration',    // Required, but ignored because of getGroupString
-            getGroupString: function (instance) {
-                return instance.data.Iteration._ref;
-            },
-            filters: Rally.data.wsapi.Filter.or(oids
-                .filter(function (oid) {
-                    return oid;
-                })
-                .map(function (oid) {
-                    return {
-                        property: 'Iteration.ObjectID',
-                        value: oid
+        if (!oids || !oids.length) {
+            // No iterations specified, nothing to do
+            deferred.resolve(iterationData);
+        } else {
+            Ext.create('Rally.data.wsapi.Store', {
+                autoLoad: true,
+                model: 'UserIterationCapacity',
+                fetch: ['Capacity', 'User', 'Iteration', 'StartDate', 'EndDate'],
+                groupField: 'Iteration',    // Required, but ignored because of getGroupString
+                getGroupString: function (instance) {
+                    return instance.data.Iteration._ref;
+                },
+                filters: Rally.data.wsapi.Filter.or(oids
+                    .filter(function (oid) {
+                        return oid;
+                    })
+                    .map(function (oid) {
+                        return {
+                            property: 'Iteration.ObjectID',
+                            value: oid
+                        }
+                    })),
+                listeners: {
+                    scope: this,
+                    load: function (store, data, success) {
+                        if (!success) {
+                            deferred.reject("Unable to load iterations");
+                        }
+                        iterationData.collectIterations(store);
+                        deferred.resolve(iterationData);
                     }
-                })),
-            listeners: {
-                scope: this,
-                load: function (store, data, success) {
-                    if (!success) {
-                        deferred.reject("Unable to load iterations");
-                    }
-                    iterationData.collectIterations(store);
-                    deferred.resolve(iterationData);
                 }
-            }
-        });
+            });
+        }
 
         return deferred.promise;
     },
 
     launch: function () {
-        // TODO (tj) support individual PIs
-        // TODO (tj) run calls in parallel
+        // TODO (tj) run stories and features calls in parallel if possible
         var features, stories;
-        this._getFeatures(SettingsUtils.getRelease())
-            .then({
-                scope: this,
-                success: function (data) {
-                    features = _.map(data, function (item) {
-                        return item.raw;
-                    });
-                    return this._getCurrentStories();
-                },
-                failure: function (msg) {
-                    Ext.Msg.alert(msg);
-                }
-            })
-            .then({
-                scope: this,
-                success: function (storiesData) {
-                    stories = storiesData;
-                    var iterationOids = stories.map(function (story) {
-                        return story.get('Iteration');
-                    });
-                    return this._getIterations(iterationOids);
-                },
-                failure: function (msg) {
-                    Ext.Msg.alert(msg);
-                }
-            })
-            .then({
-                scope: this,
-                success: function (iterationData) {
-                    var storyOids = stories.map(function (story) {
-                        return story.get('ObjectID');
-                    });
-                    this.add({
-                        xtype: 'rallychart',
-                        storeType: 'Rally.data.lookback.SnapshotStore',
-                        storeConfig: this._getStoreConfig(storyOids),
-                        calculatorType: 'com.ca.technicalservices.Burnupdown.Calculator',
-                        calculatorConfig: {
-                            granularity: 'hour',
-                            startDate: this._getEarliestStartDate(),
-                            endDate: this._getLatestEndDate(),
-                            iterationData: iterationData,
-                            features: features
-                        },
-                        chartConfig: this._getChartConfig()
-                    });
-                }
-            });
+
+        this._getFeatures().then({
+            scope: this,
+            success: function (featuresData) {
+                features = featuresData;
+                return this._getCurrentStories();
+            }
+        }).then({
+            scope: this,
+            success: function (storiesData) {
+                stories = storiesData;
+                var iterationOids = stories.map(function (story) {
+                    return story.get('Iteration');
+                });
+                return this._getIterations(iterationOids);
+            },
+            failure: function (msg) {
+                Ext.Msg.alert(msg);
+            }
+        }).then({
+            scope: this,
+            success: function (iterationData) {
+                var storyOids = stories.map(function (story) {
+                    return story.get('ObjectID');
+                });
+                this.add({
+                    xtype: 'rallychart',
+                    storeType: 'Rally.data.lookback.SnapshotStore',
+                    storeConfig: this._getStoreConfig(storyOids),
+                    calculatorType: 'com.ca.technicalservices.Burnupdown.Calculator',
+                    calculatorConfig: {
+                        granularity: 'hour',
+                        startDate: this._getEarliestStartDate(),
+                        endDate: this._getLatestEndDate(),
+                        iterationData: iterationData,
+                        features: features
+                    },
+                    chartConfig: this._getChartConfig()
+                });
+            }
+        });
     },
 
     // TODO (tj) Unit tests

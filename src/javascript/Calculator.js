@@ -44,13 +44,45 @@
             result = this._nullFutureData(result);
             // TODO (tj) handle features of same name
             var metricNames = {};
+            var colorIndex = 0;
+            var colors = [
+                'rgb(214,234,194)',
+                'rgb(167,217,197)',
+                'rgb(121,199,199)',
+                'rgb(77,183,204)',
+                'rgb(47,161,199)',
+                'rgb(41,134,181)',
+                'rgb(37,108,164)',
+                'rgb(33,83,147)',
+                'rgb(27,58,130)',
+                'rgb(22,36,115)',
+                'rgb(19,28,90)',
+                'rgb(17,21,66)'
+            ];
+
             _.each(this.features, function(feature) {
-                metricNames[feature.Name + " To Do"] = "To Do";
-                metricNames[feature.Name + " Actual"] = "Actual";
+                metricNames[feature.Name + " To Do"] = {
+                    stack: "To Do",
+                    color: Ext.draw.Color.toHex(colors[colorIndex])
+                };
+                metricNames[feature.Name + " Actual"] = {
+                    stack: "Actual",
+                    color: Ext.draw.Color.toHex(colors[colorIndex])
+                };
+                colorIndex = (colorIndex + 1) % 12;
             });
             _.each(result.series, function(series){
                 if ( metricNames.hasOwnProperty(series.name) ) {
-                    series.stack = metricNames[series.name];
+                    series.stack = metricNames[series.name].stack;
+                    series.color = metricNames[series.name].color;
+                    //series.borderColor = '#000000';
+                    //series.borderWidth = 5;
+                    if ( series.stack === "To Do" ) {
+                        //series.borderColor = '#FF0000';
+                        series.borderRadius = 10;
+                    } else {
+                        //series.borderColor = '#0000FF';
+                    }
                 }
             }, this);
             return result;
@@ -149,6 +181,7 @@
 
         getDerivedFieldsAfterSummary: function () {
             return [
+                /*
                 {
                     as: METRIC_NAME_TOTAL_CAPACITY,
                     display: 'line',
@@ -159,6 +192,7 @@
                     display: 'line',
                     f: this._getDailyCapacityForTick
                 },
+                */
                 {
                     as: METRIC_NAME_IDEAL_CAPACITY_BURNDOWN,
                     display: 'line',

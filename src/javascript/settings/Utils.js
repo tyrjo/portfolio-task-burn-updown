@@ -35,8 +35,16 @@
 
             getRelease: function () {
                 return Rally.getApp().getSetting(this.SETTING_NAME_RELEASE);
+            },
+
+            isReleaseScope: function () {
+                return Rally.getApp().getSetting(SettingsUtils.SETTING_NAME_SCOPE) === SettingsUtils.SCOPE_RELEASE_PORTFOLIO_ITEMS;
+            },
+
+            getSelectedRelease: function () {
+                return Rally.util.Ref.getOidFromRef(SettingsUtils.getRelease());
             }
-        },
+        }
     })
     ;
 }());

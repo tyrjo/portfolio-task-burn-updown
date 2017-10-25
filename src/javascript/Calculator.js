@@ -2,7 +2,9 @@
     var Ext = window.Ext4 || window.Ext;
 
     var METRIC_NAME_TODO = 'To Do';
-    var METRIC_NAME_ACTUALS = 'Actuals';
+    var METRIC_NAME_TOTAL_TODO = 'Total To Do';
+    var METRIC_NAME_ACTUAL = 'Actual';
+    var METRIC_NAME_TOTAL_ACTUAL = 'Total Actual';
     var METRIC_NAME_TOTAL_CAPACITY = 'Total Capacity';
     var METRIC_NAME_DAILY_CAPACITY = 'Daily Capacity';
     var METRIC_NAME_IDEAL_CAPACITY_BURNDOWN = 'Ideal Capacity Based Burndown';
@@ -27,12 +29,18 @@
 
         features: undefined,
 
+        featureNameMap: undefined,
+
         constructor: function (config) {
             this.initConfig(config);
             this.callParent(arguments);
             this._getTotalCapacityForTick = this._getTotalCapacityForTick.bind(this);
             this._getDailyCapacityForTick = this._getDailyCapacityForTick.bind(this);
             this._getCapacityBurndownForTick = this._getCapacityBurndownForTick.bind(this);
+            this.featureNameMap = _.reduce(this.features, function (accumulator, value) {
+                accumulator[value.ObjectID] = value.Name;
+                return accumulator;
+            }, {});
         },
 
         prepareChartData: function (store) {
@@ -60,24 +68,24 @@
                 'rgb(17,21,66)'
             ];
 
-            _.each(this.features, function(feature) {
-                metricNames[feature.Name + " To Do"] = {
-                    stack: "To Do",
+            _.each(this.features, function (feature) {
+                metricNames[feature.Name + ' ' + METRIC_NAME_TODO] = {
+                    stack: METRIC_NAME_TODO,
                     color: Ext.draw.Color.toHex(colors[colorIndex])
                 };
-                metricNames[feature.Name + " Actual"] = {
-                    stack: "Actual",
+                metricNames[feature.Name + ' ' + METRIC_NAME_ACTUAL] = {
+                    stack: METRIC_NAME_ACTUAL,
                     color: Ext.draw.Color.toHex(colors[colorIndex])
                 };
                 colorIndex = (colorIndex + 1) % 12;
             });
-            _.each(result.series, function(series){
-                if ( metricNames.hasOwnProperty(series.name) ) {
+            _.each(result.series, function (series) {
+                if (metricNames.hasOwnProperty(series.name)) {
                     series.stack = metricNames[series.name].stack;
                     series.color = metricNames[series.name].color;
                     //series.borderColor = '#000000';
                     //series.borderWidth = 5;
-                    if ( series.stack === "To Do" ) {
+                    if (series.stack === METRIC_NAME_TODO) {
                         //series.borderColor = '#FF0000';
                         series.borderRadius = 10;
                     } else {
@@ -138,9 +146,10 @@
             }
 
             if (this.remainingIdealTodo === undefined) {
-                if (snapshot['To Do'] != undefined) {
+                var featureName = this.featureNameMap[snapshot.ObjectID];
+                if (snapshot[featureName + ' ' + METRIC_NAME_TODO]) {
                     // Found the first To Do entry for this chart
-                    this.remainingIdealTodo = snapshot['To Do'];
+                    this.remainingIdealTodo = snapshot[featureName + ' ' + METRIC_NAME_TODO];
                 }
             } else {
                 this.remainingIdealTodo = Math.max(this.remainingIdealTodo - priorCapacity, 0);
@@ -149,105 +158,95 @@
             return this.remainingIdealTodo || 0;
         },
 
-        getDerivedFieldsOnInput: function () {
-            var self = this;
-            var fields = [];
-            _.forEach(this.features, function (feature) {
-                fields.push({
-                    as: feature.Name + " To Do",
-                    display: 'column',
-                    f: function (snapshot) {
-                        return self._getDataForFeature(feature, snapshot, 'TaskRemainingTotal');
-                    }
-                });
-                fields.push({
-                    as: feature.Name + " Actual",
-                    display: 'column',
-                    f: function (snapshot) {
-                        return self._getDataForFeature(feature, snapshot, 'TaskActualTotal');
-                    }
-                });
-            }, this);
-            return fields;
-        },
-
         _getDataForFeature: function (feature, snapshot, attribute) {
-            if ( snapshot.Feature === feature.ObjectID ) {
+            if (snapshot.Feature === feature.ObjectID) {
                 return snapshot[attribute];
             } else {
                 return 0;
             }
         },
 
-        getDerivedFieldsAfterSummary: function () {
-            return [
-                /*
-                {
-                    as: METRIC_NAME_TOTAL_CAPACITY,
-                    display: 'line',
-                    f: this._getTotalCapacityForTick
-                },
-                {
-                    as: METRIC_NAME_DAILY_CAPACITY,
-                    display: 'line',
-                    f: this._getDailyCapacityForTick
-                },
-                */
-                {
-                    as: METRIC_NAME_IDEAL_CAPACITY_BURNDOWN,
-                    display: 'line',
-                    f: this._getCapacityBurndownForTick
-                }
-            ]
+        getDerivedFieldsOnInput: function () {
+            var self = this;
+            var fields = [];
+            _.forEach(this.features, function (feature) {
+                _(fields).chain()
+                    .push({
+                        as: feature.Name + ' ' + METRIC_NAME_TODO,
+                        f: function (snapshot) {
+                            return self._getDataForFeature(feature, snapshot, 'TaskRemainingTotal');
+                        }
+                    })
+                    .push({
+                        as: feature.Name + ' ' + METRIC_NAME_ACTUAL,
+                        f: function (snapshot) {
+                            return self._getDataForFeature(feature, snapshot, 'TaskActualTotal');
+                        }
+                    });
+            }, this);
+            fields.push({
+                as: METRIC_NAME_DAILY_CAPACITY,
+                f: this._getDailyCapacityForTick
+            });
+
+            return fields;
         },
 
         getMetrics: function () {
             var metrics = [];
             _.each(this.features, function (feature) {
                 metrics.push({
-                    field: feature.Name + " To Do",
-                    as: feature.Name + " To Do",
+                    field: feature.Name + ' ' + METRIC_NAME_TODO,
+                    as: feature.Name + ' ' + METRIC_NAME_TODO,
                     f: 'sum',
                     display: 'column'
                 });
                 metrics.push({
-                    field: feature.Name + " Actual",
-                    as: feature.Name + " Actual",
+                    field: feature.Name + ' ' + METRIC_NAME_ACTUAL,
+                    as: feature.Name + ' ' + METRIC_NAME_ACTUAL,
                     f: 'sum',
                     display: 'column'
                 })
             });
-            return metrics;
-            /*
             metrics.push({
-                field: "TaskActualTotal",
-                as: METRIC_NAME_ACTUALS,
-                f: 'sum',
-                display: 'column'
+                field: 'TaskRemainingTotal',
+                as: METRIC_NAME_TOTAL_TODO,
+                f: 'sum'
+            });
+            metrics.push({
+                field: 'TaskActualTotal',
+                as: METRIC_NAME_TOTAL_ACTUAL,
+                f: 'sum'
+            });
+            metrics.push({
+                field: METRIC_NAME_DAILY_CAPACITY,
+                as: METRIC_NAME_IDEAL_CAPACITY_BURNDOWN,
+                display: 'line',
+                f: this._getCapacityBurndownForTick
             });
             return metrics;
-            /*
+        },
+        /*
+                getSummaryMetricsConfig: function () {
+                    return []
+                },
+        */
+        /*
+        getDerivedFieldsAfterSummary: function () {
             return [
                 {
-                    field: "TaskRemainingTotal",
-                    as: METRIC_NAME_TODO,
-                    f: 'sum',
-                    display: 'column'
+                    field: 'TaskRemainingTotal',
+                    as: METRIC_NAME_TOTAL_TODO,
+                    f: 'sum'
                 },
                 {
-                    field: "TaskActualTotal",
-                    as: METRIC_NAME_ACTUALS,
-                    f: 'sum',
-                    display: 'column'
+                    field: 'TaskActualTotal',
+                    as: METRIC_NAME_TOTAL_ACTUAL,
+                    f: 'sum'
                 }
-            ];
-            */
-        },
 
-        getProjectionsConfig: function () {
-            return {
-                limit: 1
-            };
+            ]
         }
+        */
     });
 }());

@@ -1,9 +1,9 @@
 (function () {
     var Ext = window.Ext4 || window.Ext;
 
-    var METRIC_NAME_TODO = 'To Do';
+    var METRIC_NAME_PREFIX_TODO = 'To Do ';
     var METRIC_NAME_TOTAL_TODO = 'Total To Do';
-    var METRIC_NAME_ACTUAL = 'Actual';
+    var METRIC_NAME_PREFIX_ACTUAL = 'Actual ';
     var METRIC_NAME_TOTAL_ACTUAL = 'Total Actual';
     var METRIC_NAME_TOTAL_CAPACITY = 'Total Capacity';
     var METRIC_NAME_DAILY_CAPACITY = 'Daily Capacity';
@@ -37,6 +37,7 @@
             this._getTotalCapacityForTick = this._getTotalCapacityForTick.bind(this);
             this._getDailyCapacityForTick = this._getDailyCapacityForTick.bind(this);
             this._getCapacityBurndownForTick = this._getCapacityBurndownForTick.bind(this);
+            this._getFeatureName = this._getFeatureName.bind(this);
             this.featureNameMap = _.reduce(this.features, function (accumulator, value) {
                 accumulator[value.ObjectID] = value.Name;
                 return accumulator;
@@ -47,9 +48,11 @@
             return this.callParent(arguments);
         },
 
+
         runCalculation: function (snapshots) {
             var result = this.callParent(arguments);
             result = this._nullFutureData(result);
+
             // TODO (tj) handle features of same name
             var metricNames = {};
             var colorIndex = 0;
@@ -68,31 +71,26 @@
                 'rgb(17,21,66)'
             ];
 
+            // Build a map of metric names to series attributes we want to add
             _.each(this.features, function (feature) {
-                metricNames[feature.Name + ' ' + METRIC_NAME_TODO] = {
-                    stack: METRIC_NAME_TODO,
+                metricNames[METRIC_NAME_PREFIX_TODO + feature.Name] = {
+                    stack: METRIC_NAME_PREFIX_TODO,
+                    color: Ext.draw.Color.toHex(colors[colorIndex]),
+                    borderRadius: 5
+                };
+                metricNames[METRIC_NAME_PREFIX_ACTUAL + feature.Name] = {
+                    stack: METRIC_NAME_PREFIX_ACTUAL,
                     color: Ext.draw.Color.toHex(colors[colorIndex])
                 };
-                metricNames[feature.Name + ' ' + METRIC_NAME_ACTUAL] = {
-                    stack: METRIC_NAME_ACTUAL,
-                    color: Ext.draw.Color.toHex(colors[colorIndex])
-                };
+                // TODO (tj) jump colors if fewer than 12 series
                 colorIndex = (colorIndex + 1) % 12;
             });
-            _.each(result.series, function (series) {
-                if (metricNames.hasOwnProperty(series.name)) {
-                    series.stack = metricNames[series.name].stack;
-                    series.color = metricNames[series.name].color;
-                    //series.borderColor = '#000000';
-                    //series.borderWidth = 5;
-                    if (series.stack === METRIC_NAME_TODO) {
-                        //series.borderColor = '#FF0000';
-                        series.borderRadius = 10;
-                    } else {
-                        //series.borderColor = '#0000FF';
-                    }
-                }
-            }, this);
+
+            // For each series, add any needed HighCharts series attributes
+            result.series = _.map(result.series, function(series) {
+                return _.merge(series, metricNames[series.name]);
+            });
+
             return result;
         },
 
@@ -166,24 +164,40 @@
             }
         },
 
+        _getFeatureName: function (snapshot) {
+            return this.featureNameMap[snapshot.Feature]
+        },
+
+        /**
+         * Called once for every snapshot.
+         * Not charted, but added to snapshot data
+         *
+         * These functions get original `snapshot` which is:
+         * - data from the store
+         * - any prior derived fields
+         * @returns {Array}
+         */
         getDerivedFieldsOnInput: function () {
             var self = this;
             var fields = [];
+
+            // For each snapshot, add derived fields that indicate how much that snapshot contributes
+            // to each feature. This will be summed by metrics in getMetrics.
             _.forEach(this.features, function (feature) {
-                _(fields).chain()
-                    .push({
-                        as: feature.Name + ' ' + METRIC_NAME_TODO,
-                        f: function (snapshot) {
-                            return self._getDataForFeature(feature, snapshot, 'TaskRemainingTotal');
-                        }
-                    })
-                    .push({
-                        as: feature.Name + ' ' + METRIC_NAME_ACTUAL,
-                        f: function (snapshot) {
-                            return self._getDataForFeature(feature, snapshot, 'TaskActualTotal');
-                        }
-                    });
+                fields.push({
+                    as: METRIC_NAME_PREFIX_TODO + feature.Name,
+                    f: function (snapshot) {
+                        return self._getDataForFeature(feature, snapshot, 'TaskRemainingTotal');
+                    }
+                });
+                fields.push({
+                    as: METRIC_NAME_PREFIX_ACTUAL + feature.Name,
+                    f: function (snapshot) {
+                        return self._getDataForFeature(feature, snapshot, 'TaskActualTotal');
+                    }
+                });
             }, this);
+
             fields.push({
                 as: METRIC_NAME_DAILY_CAPACITY,
                 f: this._getDailyCapacityForTick
@@ -192,22 +206,77 @@
             return fields;
         },
 
+        /**
+         * Called ?for each individual item, then again for running tally of that item plus all prior?
+         * These fields are charted
+         *
+         * `field` appears required in the config but ?might? be optional if `as` name matches field in data?
+         * `as` is required otherwise only legend appears
+         *
+         * These functions get 5 arguments:
+         * - array of values for the requested `field` from the data
+         * - ? current running value
+         * - ? array of values for the current snapshot
+         * - the outgoing row data
+         * - the `field` name + '_'
+         *
+         * @param {Number[]} [values] Must either provide values or oldResult and newValues
+         * @param {Number} [oldResult] for incremental calculation
+         * @param {Number[]} [newValues] for incremental calculation
+         *
+         *
+         * @returns {Array}
+         */
         getMetrics: function () {
             var metrics = [];
+
+            // For each feature, sum the total contributions to that feature from all snapshots
+            // in the given tick. Basically sum the derived fields created in getDerivedFieldsOnInput
+
+            // Alternatively, one might consider using 'groupBySum' fields.
+            //
+            // This will cause Lumenize to automatically generate the necessary
+            // derived fields on input that contain the data for each allowedValue, HOWEVER,
+            // by default, runCalculation will attempt to display the field NAME, not taking
+            // into account the automatically generated derived fields. runCalculation MUST be
+            // overridden to look for the 'prefix' used in these metrics, and create series
+            // definitions for each of the automatically generated derived fields AND group them
+            // together.  Inspect Rally.data.lookback.calculator.TimeSeriesCalculator methods
+            // runCalculation() and _buildSeriesConfig() to see how it doesn't understand the
+            // automatically generated derived fields needed by groupBySum or groupByCount.
+            //
+            // In the end...it is probably more understandable to create the needed derived fields
+            // explicitly in code, and create the desired output series for each one explicitly in
+            // the metrics, then simply add a grouping tag to the resulting series in runCalculation
+            // after getting result from callParent.
+            // Here in an example of groupBySum that would require special handling in runCalculation
+            /*
+            var allowedValues = _.pluck(this.features, 'Name');
+            {
+                f: 'groupBySum',
+                field: 'TaskRemainingTotal',
+                groupByField: 'Feature Name',
+                allowedValues: allowedValues,
+                prefix: 'To Do ',
+                display: 'column'
+            },
+            */
             _.each(this.features, function (feature) {
                 metrics.push({
-                    field: feature.Name + ' ' + METRIC_NAME_TODO,
-                    as: feature.Name + ' ' + METRIC_NAME_TODO,
+                    field: METRIC_NAME_PREFIX_TODO + feature.Name,
+                    as: METRIC_NAME_PREFIX_TODO + feature.Name,
                     f: 'sum',
                     display: 'column'
                 });
                 metrics.push({
-                    field: feature.Name + ' ' + METRIC_NAME_ACTUAL,
-                    as: feature.Name + ' ' + METRIC_NAME_ACTUAL,
+                    field: METRIC_NAME_PREFIX_ACTUAL + feature.Name,
+                    as: METRIC_NAME_PREFIX_ACTUAL + feature.Name,
                     f: 'sum',
                     display: 'column'
-                })
+                });
             });
+
+            // Also, sum the total values for all snapshots for all features
             metrics.push({
                 field: 'TaskRemainingTotal',
                 as: METRIC_NAME_TOTAL_TODO,
@@ -218,22 +287,69 @@
                 as: METRIC_NAME_TOTAL_ACTUAL,
                 f: 'sum'
             });
+            /* TODO (tj)
             metrics.push({
                 field: METRIC_NAME_DAILY_CAPACITY,
                 as: METRIC_NAME_IDEAL_CAPACITY_BURNDOWN,
                 display: 'line',
                 f: this._getCapacityBurndownForTick
             });
+            */
+
             return metrics;
         },
+
+        /**
+         * Called ONCE!
+         * Not charted
+         *
+         * Get moar derived fields AFTER the main chart metrics are defined
+         * These functions get:
+         * - seriesData
+         *   - array of component values for each metric result named <metric 'as' name>_values
+         *   - result value for metrics, named <metric 'as' name>
+         * - summary metrics which is an object containing the result of any prior summary metrics
+         *
+         * @returns {Array}
+         */
         /*
-                getSummaryMetricsConfig: function () {
-                    return []
+        getSummaryMetricsConfig: function () {
+            return [
+                {
+                    //field: 'Test Metric Field',
+                    as: 'Summary Test Metric Field',
+                    f: function () {
+                        console.log(arguments);
+                        return 100;
+                    }
                 },
+                {
+                    //field: "Test Derived Field On Input",
+                    as: "Summary Test Derived Field On Input",
+                    f: function () {
+                        console.log(arguments);
+                        return 100;
+                    }
+                }
+            ]
+        },
         */
-        /*
+
+        /**
+         * Called once for every snapshot.
+         * These fields are charted
+         *
+         * Extra chart fields to display using fields defined in summary metrics.  These
+         * functions get:
+         * - snapshot - the result of any metrics plus the array of component values for each metric
+         * - index - the index into series data for this snapshot
+         * - summary metrics - object of the summary metrics
+         * - series data - the array of snapshots where index-1 has been updated with the result of the derived fields
+         * @returns {Array}
+         */
         getDerivedFieldsAfterSummary: function () {
             return [
+                /*
                 {
                     field: 'TaskRemainingTotal',
                     as: METRIC_NAME_TOTAL_TODO,
@@ -243,10 +359,18 @@
                     field: 'TaskActualTotal',
                     as: METRIC_NAME_TOTAL_ACTUAL,
                     f: 'sum'
+                },
+                {
+                    as: 'Derived Field After Summary',
+                    f: function () {
+                        console.log(arguments);
+                        return 100;
+                    },
+                    display: 'column'
                 }
+                */
 
             ]
         }
-        */
     });
 }());

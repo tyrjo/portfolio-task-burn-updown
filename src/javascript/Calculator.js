@@ -9,6 +9,8 @@
     var METRIC_NAME_DAILY_CAPACITY = 'Daily Capacity';
     var METRIC_NAME_IDEAL_CAPACITY_BURNDOWN = 'Ideal Capacity Based Burndown';
 
+    var SUMMARY_METRIC_NAME_TOTAL_TODO_START_INDEX = METRIC_NAME_TOTAL_TODO + ' Start Index';
+
     Ext.define('com.ca.technicalservices.Burnupdown.Calculator', {
         extend: 'Rally.data.lookback.calculator.TimeSeriesCalculator',
         config: {
@@ -34,10 +36,11 @@
         constructor: function (config) {
             this.initConfig(config);
             this.callParent(arguments);
-            this._getTotalCapacityForTick = this._getTotalCapacityForTick.bind(this);
+            //this._getTotalCapacityForTick = this._getTotalCapacityForTick.bind(this);
             this._getDailyCapacityForTick = this._getDailyCapacityForTick.bind(this);
             this._getCapacityBurndownForTick = this._getCapacityBurndownForTick.bind(this);
             this._getFeatureName = this._getFeatureName.bind(this);
+
             this.featureNameMap = _.reduce(this.features, function (accumulator, value) {
                 accumulator[value.ObjectID] = value.Name;
                 return accumulator;
@@ -87,7 +90,7 @@
             });
 
             // For each series, add any needed HighCharts series attributes
-            result.series = _.map(result.series, function(series) {
+            result.series = _.map(result.series, function (series) {
                 return _.merge(series, metricNames[series.name]);
             });
 
@@ -127,17 +130,40 @@
             return date_index;
         },
 
-        _getTotalCapacityForTick: function (snapshot, index, metric, seriesData) {
+        /*
+        _getTotalCapacityForTick: function (snapshot) {
             var capacities = this.iterationData.getCapacitiesForDateString(snapshot.tick);
             return capacities.total;
         },
+        */
 
-        _getDailyCapacityForTick: function (snapshot, index, metric, seriesData) {
+        _getDailyCapacityForTick: function (snapshot) {
             var capacities = this.iterationData.getCapacitiesForDateString(snapshot.tick);
             return capacities.daily;
         },
 
-        _getCapacityBurndownForTick: function (snapshot, index, metric, seriesData) {
+        _getCapacityBurndownForTick: function (snapshot, index, summaryMetrics, seriesData) {
+            var result = 0;
+
+            var todoStartIndex = summaryMetrics[SUMMARY_METRIC_NAME_TOTAL_TODO_START_INDEX];
+            if (index < todoStartIndex) {
+                // Haven't started yet
+                result = null;
+            } else if (index == todoStartIndex) {
+                // First day To Do data is available, this is start of ideal burndown
+                result = snapshot[METRIC_NAME_TOTAL_TODO];
+            } else {
+                var priorSnapshot = seriesData[index-1];
+                var currentCapacity = this._getDailyCapacityForTick(snapshot);
+
+                // Today the team (ideally) would have reduced yesterday's remaining work by today's
+                // daily capacity resulting in today's "ideal capacity burndown" value, which will be
+                // the idea amount of work the team will reduce by tomorrow's capacity, etc.
+                result = Math.max(0, priorSnapshot[METRIC_NAME_IDEAL_CAPACITY_BURNDOWN] - currentCapacity);
+            }
+            return result;
+
+            /*
             var priorCapacity = 0;
             if (index > 0 && seriesData[index - 1][METRIC_NAME_DAILY_CAPACITY]) {
                 priorCapacity = seriesData[index - 1][METRIC_NAME_DAILY_CAPACITY]
@@ -154,6 +180,7 @@
             }
 
             return this.remainingIdealTodo || 0;
+            */
         },
 
         _getDataForFeature: function (feature, snapshot, attribute) {
@@ -197,11 +224,6 @@
                     }
                 });
             }, this);
-
-            fields.push({
-                as: METRIC_NAME_DAILY_CAPACITY,
-                f: this._getDailyCapacityForTick
-            });
 
             return fields;
         },
@@ -287,14 +309,6 @@
                 as: METRIC_NAME_TOTAL_ACTUAL,
                 f: 'sum'
             });
-            /* TODO (tj)
-            metrics.push({
-                field: METRIC_NAME_DAILY_CAPACITY,
-                as: METRIC_NAME_IDEAL_CAPACITY_BURNDOWN,
-                display: 'line',
-                f: this._getCapacityBurndownForTick
-            });
-            */
 
             return metrics;
         },
@@ -312,28 +326,17 @@
          *
          * @returns {Array}
          */
-        /*
+
         getSummaryMetricsConfig: function () {
             return [
                 {
-                    //field: 'Test Metric Field',
-                    as: 'Summary Test Metric Field',
-                    f: function () {
-                        console.log(arguments);
-                        return 100;
-                    }
-                },
-                {
-                    //field: "Test Derived Field On Input",
-                    as: "Summary Test Derived Field On Input",
-                    f: function () {
-                        console.log(arguments);
-                        return 100;
+                    as: SUMMARY_METRIC_NAME_TOTAL_TODO_START_INDEX,
+                    f: function (seriesData, summaryMetrics) {
+                        return _.findIndex(seriesData, METRIC_NAME_TOTAL_TODO);
                     }
                 }
             ]
         },
-        */
 
         /**
          * Called once for every snapshot.
@@ -360,17 +363,16 @@
                     as: METRIC_NAME_TOTAL_ACTUAL,
                     f: 'sum'
                 },
-                {
-                    as: 'Derived Field After Summary',
-                    f: function () {
-                        console.log(arguments);
-                        return 100;
-                    },
-                    display: 'column'
-                }
                 */
+                {
+                    as: METRIC_NAME_IDEAL_CAPACITY_BURNDOWN,
+                    f: this._getCapacityBurndownForTick,
+                    display: 'line'
+                }
 
             ]
         }
+
+
     });
 }());

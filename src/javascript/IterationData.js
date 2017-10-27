@@ -1,11 +1,11 @@
 (function () {
     var Ext = window.Ext4 || window.Ext;
 
-    Ext.define("com.ca.technicalservices.IterationData", {
+    Ext.define("com.ca.technicalservices.Burnupdown.IterationData", {
         alias: "tsiterationdata",
 
         config: {
-            app: undefined
+            workDays: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
         },
 
         iterations: {},
@@ -31,23 +31,46 @@
 
                 // add capacity data
                 iteration.capacity = capacityTotals[iteration._ref];
+                iteration.dailyCapacity = iteration.capacity / this.workingDayCount(iteration);
 
                 this.iterations[iteration._ref] = iteration;
             }, this);
         },
 
-        getCapacityForDateString: function(dateString) {
+        workingDayCount: function (iteration) {
+                if ( !iteration.StartDate || ! iteration.EndDate ) {
+                    // Unexpected, I don't think iterations can be missing these dates
+                    Ext.MessageBox.alert("Invalid Iteration", "Iteration " + iteration.Name + " missing StartDate or EndDate");
+                    return undefined;
+                }
+
+                var count = 0;
+                var date = Ext.Date.parse(iteration.StartDate, 'c');
+                var endDate = Ext.Date.parse(iteration.EndDate, 'c');
+                while ( date <= endDate ) {
+                    var day = Ext.Date.format(date, 'l');
+                    if (_.contains(this.workDays, day) ) {
+                        count++;
+                    }
+                    date = Ext.Date.add(date, Ext.Date.DAY, 1);
+                }
+                return count;
+        },
+
+        getCapacitiesForDateString: function(dateString) {
             var date = Ext.Date.parse(dateString, 'c');
             var iteration = _.find(this.iterations, function(value) {
-                if ( value.StartDate <= date &&
-                    value.EndDate >= date ) {
+                if ( Ext.Date.between(date, value.StartDate, value.EndDate ) ) {
                     return true;
                 } else {
                     return false;
                 }
             });
 
-            return iteration ? iteration.capacity : 0;
+            return iteration ? {
+                total: iteration.capacity,
+                daily: iteration.dailyCapacity
+            } : 0;
         }
     });
 }());

@@ -1,10 +1,12 @@
 {
   "name": "Portfolio Task Burn Up/Down",
   "sdk": "2.1",
-  "className": "PTBUD",
+  "className": "com.ca.technicalservices.Burnupdown",
   "story": "",
   "javascript": [
+    "src/javascript/settings/Utils.js",
     "src/javascript/settings/PortfolioItemPicker.js",
+    "src/javascript/Calculator.js",
     "src/javascript/IterationData.js",
     "src/javascript/utils/__ts-info-link.js",
     "src/javascript/utils/__ts-logger.js",

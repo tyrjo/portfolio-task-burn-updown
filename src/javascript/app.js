@@ -10,6 +10,16 @@
  * Select Portfolio Item with no direct children
  * Select Portfolio Item with no decendent Stories
  * Select Portfolio Items with mix of decendent Stories and no decendent
+ *
+ * What if no items returned for any expected item? Features, Iterations, Stories, etc...
+ */
+
+// TODO (tj) Possible optimizations
+/**
+ * If only 1 features, make todo and actual different colors
+ * dash/dot the todo and actual lines
+ * distinct colors for all lines (different from columns)
+ * Start chart on actual start date
  */
 
 Ext.define("com.ca.technicalservices.Burnupdown", {
@@ -34,7 +44,36 @@ Ext.define("com.ca.technicalservices.Burnupdown", {
         }
     },
 
-    featureFields: ['ObjectID', 'Name', 'c_InitialHourEstimate'],
+    featureFields: [
+        'ObjectID',
+        'Name',
+        'c_InitialHourEstimate',
+        'PlannedStartDate',
+        'ActualStartDate',
+        'PlannedEndDate'
+    ],
+
+    userIterationCapacityFields: [
+        'Capacity',
+        'User',
+        'Iteration',
+        'StartDate',
+        'EndDate'
+    ],
+
+    hierarchicalRequirementFields: [
+        'Name',
+        'TaskEstimateTotal',
+        'TaskActualTotal',
+        'TaskRemainingTotal',
+        'Feature'
+    ],
+
+    releaseFields: [
+        'ReleaseStartDate',
+        'ReleaseDate',
+
+    ],
 
     getSettingsFields: function () {
         return [
@@ -110,6 +149,7 @@ Ext.define("com.ca.technicalservices.Burnupdown", {
             scope: this,
             success: function (data) {
                 return _.map(data, function (item) {
+                    // TODO (tj) avoid use of raw so that get() is available
                     return item.raw;
                 });
             },
@@ -205,19 +245,20 @@ Ext.define("com.ca.technicalservices.Burnupdown", {
     _getIterations: function (oids) {
         var iterationData = Ext.create('com.ca.technicalservices.Burnupdown.IterationData');
         var deferred = Ext.create('Deft.Deferred');
-        if (!oids || !oids.length) {
+        var iterationOids = _.filter(oids);
+        if (!iterationOids.length) {
             // No iterations specified, nothing to do
             deferred.resolve(iterationData);
         } else {
             Ext.create('Rally.data.wsapi.Store', {
                 autoLoad: true,
                 model: 'UserIterationCapacity',
-                fetch: ['Capacity', 'User', 'Iteration', 'StartDate', 'EndDate'],
+                fetch: this.userIterationCapacityFields,
                 groupField: 'Iteration',    // Required, but ignored because of getGroupString
                 getGroupString: function (instance) {
                     return instance.data.Iteration._ref;
                 },
-                filters: Rally.data.wsapi.Filter.or(oids
+                filters: Rally.data.wsapi.Filter.or(iterationOids
                     .filter(function (oid) {
                         return oid;
                     })
@@ -245,80 +286,166 @@ Ext.define("com.ca.technicalservices.Burnupdown", {
 
     launch: function () {
         // TODO (tj) run stories and features calls in parallel if possible
-        var features, stories;
+        var features, stories, dates
 
-        this._getFeatures().then({
-            scope: this,
-            success: function (featuresData) {
-                features = featuresData;
-                return this._getCurrentStories();
-            }
-        }).then({
-            scope: this,
-            success: function (storiesData) {
-                stories = storiesData;
-                var iterationOids = stories.map(function (story) {
-                    return story.get('Iteration');
-                });
-                return this._getIterations(iterationOids);
-            },
-            failure: function (msg) {
-                Ext.Msg.alert(msg);
-            }
-        }).then({
-            scope: this,
-            success: function (iterationData) {
-                var storyOids = stories.map(function (story) {
-                    return story.get('ObjectID');
-                });
-                this.add({
-                    xtype: 'rallychart',
-                    storeType: 'Rally.data.lookback.SnapshotStore',
-                    storeConfig: this._getStoreConfig(storyOids),
-                    calculatorType: 'com.ca.technicalservices.Burnupdown.Calculator',
-                    calculatorConfig: {
-                        granularity: 'hour',
-                        startDate: this._getEarliestStartDate(),
-                        endDate: this._getLatestEndDate(),
-                        iterationData: iterationData,
-                        features: features
-                    },
-                    chartConfig: this._getChartConfig()
-                });
+        this._getFeatures()
+            .then({
+                scope: this,
+                success: function (featuresData) {
+                    features = featuresData;
+                    return this._getDates(features);
+                }
+            })
+            .then({
+                scope: this,
+                success: function (datesData) {
+                    dates = datesData;
+                    return this._getCurrentStories();
+                }
+            })
+            .then({
+                scope: this,
+                success: function (storiesData) {
+                    stories = storiesData;
+                    var iterationOids = stories.map(function (story) {
+                        return story.get('Iteration');
+                    });
+                    return this._getIterations(iterationOids);
+                },
+                failure: function (msg) {
+                    Ext.Msg.alert(msg);
+                }
+            })
+            .then({
+                scope: this,
+                success: function (iterationData) {
+                    var storyOids = stories.map(function (story) {
+                        return story.get('ObjectID');
+                    });
+
+                    // Use the earliest actual start if there is one, otherwise use the earliest planned,
+                    // otherwise fall back on today
+                    var startDate;
+                    if (dates.earliestActualStartDate) {
+                        startDate = dates.earliestActualStartDate;
+                    } else {
+                        startDate = dates.earliestPlannedStartDate || new Date();
+                    }
+
+                    var endDate = dates.latestPlannedEndDate || new Date();
+
+                    this.add({
+                        xtype: 'rallychart',
+                        storeType: 'Rally.data.lookback.SnapshotStore',
+                        storeConfig: this._getStoreConfig(storyOids),
+                        calculatorType: 'com.ca.technicalservices.Burnupdown.Calculator',
+                        calculatorConfig: {
+                            granularity: 'hour',
+                            startDate: startDate,
+                            endDate: endDate,
+                            iterationData: iterationData,
+                            features: features
+                        },
+                        chartConfig: this._getChartConfig()
+                    });
+                }
+            });
+    },
+
+    _getDates: function (features) {
+        var result;
+        var deferred = Ext.create('Deft.Deferred');
+        var initialValue = {
+            earliestPlannedStartDate: undefined,
+            earliestActualStartDate: undefined,
+            latestPlannedEndDate: undefined
+        };
+
+        var featureDates = this._getFeatureDates(features, initialValue);
+
+        if (SettingsUtils.isReleaseScope()) {
+            // Use release StartDate or Pis actual start dates and ReleaseDate
+            result = this._getDatesFromRelease(SettingsUtils.getRelease(), featureDates);
+        } else {
+            result = Deft.promise.Promise.when(featureDates);
+        }
+
+        return result;
+    },
+
+    // TODO (tj) refactor to move date structure to an object
+    _getDatesFromRelease: function (releaseRef, initialValue) {
+        var deferred = Ext.create('Deft.Deferred');
+
+        Ext.create('Rally.data.wsapi.Store', {
+            autoLoad: true,
+            model: 'Release',
+            fetch: this.releaseFields,
+
+            filters: [
+                {
+                    property: 'ObjectID',
+                    value: Rally.util.Ref.getOidFromRef(releaseRef)
+                }
+            ],
+            listeners: {
+                scope: this,
+                load: function (store, data, success) {
+                    if (!success || data.length < 1) {
+                        deferred.reject("Unable to load release");
+                    }
+                    var result = initialValue;
+                    var release = data[0];
+                    result.earliestPlannedStartDate =
+                        this._laterDate(release.get('ReleaseStartDate'), initialValue.earliestPlannedStartDate);
+                    result.earliestActualStartDate =
+                        this._laterDate(release.get('ReleaseStartDate'), initialValue.earliestActualStartDate);
+                    result.latestPlannedEndDate =
+                        this._laterDate(release.get('ReleaseDate'), initialValue.latestPlannedEndDate);
+                    deferred.resolve(result);
+                }
             }
         });
+
+        return deferred.promise;
     },
 
-    // TODO (tj) Unit tests
-    _getEarliestStartDate: function () {
-        var date = this._getPortfolioItems().reduce(function (accumulator, currentValue) {
-            var currentPlannedStartDate = currentValue.PlannedStartDate ? Ext.Date.parse(currentValue.PlannedStartDate, 'c') : new Date();
-            var currentActualStartDate = currentValue.ActualStartDate ? Ext.Date.parse(currentValue.ActualStartDate, 'c') : new Date();
-            var earliestDate = (currentActualStartDate < currentPlannedStartDate) ? currentActualStartDate : currentPlannedStartDate;
+    _getFeatureDates: function (features, initialValue) {
+        var result = _.reduce(features, function (accumulator, feature) {
+            var plannedStartDate = feature.PlannedStartDate ? Ext.Date.parse(feature.PlannedStartDate, 'c') : undefined;
+            var actualStartDate = feature.ActualStartDate ? Ext.Date.parse(feature.ActualStartDate, 'c') : undefined;
+            var plannedEndDate = feature.PlannedEndDate ? Ext.Date.parse(feature.PlannedEndDate, 'c') : undefined;
 
-            if (accumulator && accumulator < earliestDate) {
-                earliestDate = accumulator;
-            }
+            accumulator.earliestPlannedStartDate = this._earlierDate(plannedStartDate, accumulator.earliestPlannedStartDate);
+            accumulator.earliestActualStartDate = this._earlierDate(actualStartDate, accumulator.earliestActualStartDate);
+            accumulator.latestPlannedEndDate = this._laterDate(plannedEndDate, accumulator.latestPlannedEndDate);
 
-            return earliestDate;
+            return accumulator;
 
-        }, null);
-        return date;
+        }, initialValue, this);
+
+        return result;
     },
 
-    // TODO (tj) Unit tests
-    _getLatestEndDate: function () {
-        var date = this._getPortfolioItems().reduce(function (accumulator, currentValue) {
-            var latestDate = currentValue.PlannedEndDate ? Ext.Date.parse(currentValue.PlannedEndDate, 'c') : new Date();
-
-            if (accumulator && accumulator > latestDate) {
-                latestDate = accumulator;
+    // TODO (tj) move to a utility function
+    _earlierDate: function (d1, d2) {
+        var result = d2;
+        if (d1) {
+            if (!d2 || (d1 < d2)) {
+                result = d1;
             }
+        }
+        return result;
+    },
 
-            return latestDate;
-
-        }, null);
-        return date;
+    _laterDate: function (d1, d2) {
+        var result = d2;
+        if (d1) {
+            if (!d2 || (d1 > d2)) {
+                result = d1;
+            }
+        }
+        return result;
     },
 
     /**
@@ -331,11 +458,9 @@ Ext.define("com.ca.technicalservices.Burnupdown", {
                 _TypeHierarchy: {'$in': ['HierarchicalRequirement']},
                 Children: null,
                 ObjectID: {'$in': oids},
-                //_ItemHierarchy: {'$in': this._getPortfolioItems()},
-                //_ValidFrom: { '$gt': Rally.util.DateTime.toIsoString(Rally.util.DateTime.add(new Date(), 'day', -30)) }
                 _ValidFrom: {'$lt': Rally.util.DateTime.toIsoString(new Date())}
             },
-            fetch: ['Name', 'TaskEstimateTotal', 'TaskActualTotal', 'TaskRemainingTotal', 'Feature'],
+            fetch: this.hierarchicalRequirementFields,
             sort: {
                 _ValidFrom: 1
             },

@@ -12,6 +12,8 @@
 
     var SUMMARY_METRIC_NAME_TOTAL_TODO_START_INDEX = METRIC_NAME_TOTAL_TODO + ' Start Index';
     var SUMMARY_METRIC_NAME_INITIAL_HOUR_ESTIMATE = 'Preliminary Estimate';
+    var SUMMARY_METRIC_NAME_IDEAL_BURNDOWN = 'Ideal';
+    var SUMMARY_METRIC_NAME_TOTAL_TODO_MAX = METRIC_NAME_TOTAL_TODO + ' Max';
 
     Ext.define('com.ca.technicalservices.Burnupdown.Calculator', {
         extend: 'Rally.data.lookback.calculator.TimeSeriesCalculator',
@@ -28,7 +30,10 @@
         metricsAllowedOnFutureDates: [
             METRIC_NAME_TOTAL_CAPACITY,
             METRIC_NAME_DAILY_CAPACITY,
-            METRIC_NAME_IDEAL_CAPACITY_BURNDOWN
+            METRIC_NAME_IDEAL_CAPACITY_BURNDOWN,
+            METRIC_NAME_TASK_ESTIMATE_TOTAL,
+            SUMMARY_METRIC_NAME_IDEAL_BURNDOWN,
+            SUMMARY_METRIC_NAME_INITIAL_HOUR_ESTIMATE
         ],
 
         features: undefined,
@@ -44,6 +49,7 @@
             this._getFeatureName = this._getFeatureName.bind(this);
             this._getFeaturesInitialHourEstimates = this._getFeaturesInitialHourEstimates.bind(this);
             this._getFeaturesInitialHourEstimatesMetric = this._getFeaturesInitialHourEstimatesMetric.bind(this);
+            this._getIdealBurndown = this._getIdealBurndown.bind(this);
 
             this.featureNameMap = _.reduce(this.features, function (accumulator, value) {
                 accumulator[value.ObjectID] = value.Name;
@@ -79,7 +85,7 @@
             ];
 
             // Build a map of metric names to series attributes we want to add
-            var colorIndexStep = Math.floor(12 / Math.min(12,this.features.length));
+            var colorIndexStep = Math.floor(12 / Math.min(12, this.features.length));
             _.each(this.features, function (feature) {
                 metricNames[METRIC_NAME_PREFIX_TODO + feature.Name] = {
                     stack: METRIC_NAME_PREFIX_TODO,
@@ -158,7 +164,7 @@
                 // First day To Do data is available, this is start of ideal burndown
                 result = snapshot[METRIC_NAME_TOTAL_TODO];
             } else {
-                var priorSnapshot = seriesData[index-1];
+                var priorSnapshot = seriesData[index - 1];
                 var currentCapacity = this._getDailyCapacityForTick(snapshot);
 
                 // Today the team (ideally) would have reduced yesterday's remaining work by today's
@@ -200,14 +206,35 @@
             return this.featureNameMap[snapshot.Feature]
         },
 
-        _getFeaturesInitialHourEstimates: function() {
-            return _.reduce(this.features, function(sum, feature) {
+        _getFeaturesInitialHourEstimates: function () {
+            return _.reduce(this.features, function (sum, feature) {
                 return sum + feature.c_InitialHourEstimate;
             }, 0);
         },
 
-        _getFeaturesInitialHourEstimatesMetric: function(snapshot, index, summaryMetrics, seriesData) {
-          return summaryMetrics[SUMMARY_METRIC_NAME_INITIAL_HOUR_ESTIMATE];
+        _getFeaturesInitialHourEstimatesMetric: function (snapshot, index, summaryMetrics, seriesData) {
+            return summaryMetrics[SUMMARY_METRIC_NAME_INITIAL_HOUR_ESTIMATE];
+        },
+
+        _getIdealBurndown: function (snapshot, index, summaryMetrics, seriesData) {
+
+            var result = 0;
+
+            var todoStartIndex = summaryMetrics[SUMMARY_METRIC_NAME_TOTAL_TODO_START_INDEX];
+
+            if (index < todoStartIndex) {
+                // Haven't started yet
+                result = null;
+            } else if (index == todoStartIndex) {
+                // First day To Do data is available, this is start of ideal burndown
+                result = summaryMetrics[SUMMARY_METRIC_NAME_TOTAL_TODO_MAX];
+            } else {
+                var max = summaryMetrics[SUMMARY_METRIC_NAME_TOTAL_TODO_MAX];
+                var increments = seriesData.length-1-todoStartIndex;
+                var incrementAmount = max / increments;
+                return Math.floor(100 * (max - ((index - todoStartIndex) * incrementAmount))) / 100
+            }
+            return result;
         },
 
         /**
@@ -327,8 +354,8 @@
 
             // Add Task Estimate Totals
             metrics.push({
-               field: 'TaskEstimateTotal',
-               as: METRIC_NAME_TASK_ESTIMATE_TOTAL,
+                field: 'TaskEstimateTotal',
+                as: METRIC_NAME_TASK_ESTIMATE_TOTAL,
                 f: 'sum'
             });
 
@@ -360,6 +387,11 @@
                 {
                     as: SUMMARY_METRIC_NAME_INITIAL_HOUR_ESTIMATE,
                     f: this._getFeaturesInitialHourEstimates
+                },
+                {
+                    field: METRIC_NAME_TOTAL_TODO,
+                    as: SUMMARY_METRIC_NAME_TOTAL_TODO_MAX,
+                    f: 'max'
                 }
             ]
         },
@@ -400,8 +432,12 @@
                     as: SUMMARY_METRIC_NAME_INITIAL_HOUR_ESTIMATE,
                     f: this._getFeaturesInitialHourEstimatesMetric,
                     display: 'line'
+                },
+                {
+                    as: SUMMARY_METRIC_NAME_IDEAL_BURNDOWN,
+                    f: this._getIdealBurndown,
+                    display: 'line'
                 }
-
             ]
         }
 

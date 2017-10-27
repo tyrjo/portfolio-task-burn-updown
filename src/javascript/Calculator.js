@@ -75,6 +75,7 @@
             ];
 
             // Build a map of metric names to series attributes we want to add
+            var colorIndexStep = Math.floor(12 / Math.min(12,this.features.length));
             _.each(this.features, function (feature) {
                 metricNames[METRIC_NAME_PREFIX_TODO + feature.Name] = {
                     stack: METRIC_NAME_PREFIX_TODO,
@@ -86,7 +87,7 @@
                     color: Ext.draw.Color.toHex(colors[colorIndex])
                 };
                 // TODO (tj) jump colors if fewer than 12 series
-                colorIndex = (colorIndex + 1) % 12;
+                colorIndex = (colorIndex + colorIndexStep) % 12;
             });
 
             // For each series, add any needed HighCharts series attributes

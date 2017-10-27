@@ -34,6 +34,8 @@ Ext.define("com.ca.technicalservices.Burnupdown", {
         }
     },
 
+    featureFields: ['ObjectID', 'Name', 'c_InitialHourEstimate'],
+
     getSettingsFields: function () {
         return [
             {
@@ -123,7 +125,7 @@ Ext.define("com.ca.technicalservices.Burnupdown", {
         Ext.create('Rally.data.wsapi.Store', {
             autoLoad: true,
             model: 'PortfolioItem/Feature',
-            fetch: ['ObjectID', 'Name'],
+            fetch: this.featureFields,
             filters: [
                 {
                     property: 'Release',
@@ -183,7 +185,7 @@ Ext.define("com.ca.technicalservices.Burnupdown", {
 
         Ext.create('Rally.data.lookback.SnapshotStore', {
             autoLoad: true,
-            fetch: ['ObjectID', 'Name'],
+            fetch: this.featureFields,
             filters: filters,
             listeners: {
                 load: function (store, data, success) {

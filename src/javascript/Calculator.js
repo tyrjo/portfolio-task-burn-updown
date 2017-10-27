@@ -8,8 +8,10 @@
     var METRIC_NAME_TOTAL_CAPACITY = 'Total Capacity';
     var METRIC_NAME_DAILY_CAPACITY = 'Daily Capacity';
     var METRIC_NAME_IDEAL_CAPACITY_BURNDOWN = 'Ideal Capacity Based Burndown';
+    var METRIC_NAME_TASK_ESTIMATE_TOTAL = 'Refined Estimate';
 
     var SUMMARY_METRIC_NAME_TOTAL_TODO_START_INDEX = METRIC_NAME_TOTAL_TODO + ' Start Index';
+    var SUMMARY_METRIC_NAME_INITIAL_HOUR_ESTIMATE = 'Preliminary Estimate';
 
     Ext.define('com.ca.technicalservices.Burnupdown.Calculator', {
         extend: 'Rally.data.lookback.calculator.TimeSeriesCalculator',
@@ -40,6 +42,8 @@
             this._getDailyCapacityForTick = this._getDailyCapacityForTick.bind(this);
             this._getCapacityBurndownForTick = this._getCapacityBurndownForTick.bind(this);
             this._getFeatureName = this._getFeatureName.bind(this);
+            this._getFeaturesInitialHourEstimates = this._getFeaturesInitialHourEstimates.bind(this);
+            this._getFeaturesInitialHourEstimatesMetric = this._getFeaturesInitialHourEstimatesMetric.bind(this);
 
             this.featureNameMap = _.reduce(this.features, function (accumulator, value) {
                 accumulator[value.ObjectID] = value.Name;
@@ -196,6 +200,16 @@
             return this.featureNameMap[snapshot.Feature]
         },
 
+        _getFeaturesInitialHourEstimates: function() {
+            return _.reduce(this.features, function(sum, feature) {
+                return sum + feature.c_InitialHourEstimate;
+            }, 0);
+        },
+
+        _getFeaturesInitialHourEstimatesMetric: function(snapshot, index, summaryMetrics, seriesData) {
+          return summaryMetrics[SUMMARY_METRIC_NAME_INITIAL_HOUR_ESTIMATE];
+        },
+
         /**
          * Called once for every snapshot.
          * Not charted, but added to snapshot data
@@ -311,6 +325,13 @@
                 f: 'sum'
             });
 
+            // Add Task Estimate Totals
+            metrics.push({
+               field: 'TaskEstimateTotal',
+               as: METRIC_NAME_TASK_ESTIMATE_TOTAL,
+                f: 'sum'
+            });
+
             return metrics;
         },
 
@@ -335,6 +356,10 @@
                     f: function (seriesData, summaryMetrics) {
                         return _.findIndex(seriesData, METRIC_NAME_TOTAL_TODO);
                     }
+                },
+                {
+                    as: SUMMARY_METRIC_NAME_INITIAL_HOUR_ESTIMATE,
+                    f: this._getFeaturesInitialHourEstimates
                 }
             ]
         },
@@ -368,6 +393,12 @@
                 {
                     as: METRIC_NAME_IDEAL_CAPACITY_BURNDOWN,
                     f: this._getCapacityBurndownForTick,
+                    display: 'line'
+                },
+                {
+                    field: SUMMARY_METRIC_NAME_INITIAL_HOUR_ESTIMATE,
+                    as: SUMMARY_METRIC_NAME_INITIAL_HOUR_ESTIMATE,
+                    f: this._getFeaturesInitialHourEstimatesMetric,
                     display: 'line'
                 }
 

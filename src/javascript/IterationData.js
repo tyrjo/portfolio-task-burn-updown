@@ -70,7 +70,10 @@
             return iteration ? {
                 total: iteration.capacity,
                 daily: iteration.dailyCapacity
-            } : 0;
+            } : {
+                total: 0,
+                daily: 0
+            };
         }
     });
 }());

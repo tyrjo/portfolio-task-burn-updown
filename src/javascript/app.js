@@ -126,16 +126,16 @@ Ext.define("com.ca.technicalservices.Burnupdown", {
             filters: filters,
             listeners: {
                 load: function (store, data, success) {
-                    if (!success) {
+                    if (!success || data.length < 1) {
                         deferred.reject("Unable to load user stories");
+                    } else {
+                        deferred.resolve(data);
                     }
-
-                    deferred.resolve(data);
                 }
             },
         });
 
-        return deferred.promise;
+        return deferred.getPromise();
     },
 
     _getFeatures: function () {
@@ -152,9 +152,6 @@ Ext.define("com.ca.technicalservices.Burnupdown", {
                     // TODO (tj) avoid use of raw so that get() is available
                     return item.raw;
                 });
-            },
-            failure: function (msg) {
-                Ext.Msg.alert(msg);
             }
         })
 
@@ -162,82 +159,92 @@ Ext.define("com.ca.technicalservices.Burnupdown", {
 
     _getFeaturesFromRelease: function (release) {
         var deferred = Ext.create('Deft.Deferred');
-        Ext.create('Rally.data.wsapi.Store', {
-            autoLoad: true,
-            model: 'PortfolioItem/Feature',
-            fetch: this.featureFields,
-            filters: [
-                {
-                    property: 'Release',
-                    value: release
-                }
-            ],
-            listeners: {
-                scope: this,
-                load: function (store, data, success) {
-                    if (!success) {
-                        deferred.reject("Unable to load features");
-                    }
 
-                    deferred.resolve(data);
+        if (release) {
+            Ext.create('Rally.data.wsapi.Store', {
+                autoLoad: true,
+                model: 'PortfolioItem/Feature',
+                fetch: this.featureFields,
+                filters: [
+                    {
+                        property: 'Release',
+                        value: release
+                    }
+                ],
+                listeners: {
+                    scope: this,
+                    load: function (store, data, success) {
+                        if (!success) {
+                            deferred.reject("Unable to load features from release " + release.Name);
+                        } else {
+                            deferred.resolve(data);
+                        }
+                    }
                 }
-            }
-        });
-        return deferred.promise;
+            });
+        } else {
+            deferred.reject("No release set");
+        }
+        return deferred.getPromise();
     },
 
     // Only works for feature PIs
     _getFeaturesFromPis: function (portfolioItems) {
+        var deferred = Ext.create('Deft.Deferred');
         portfolioOids = _.map(portfolioItems, function (item) {
             return item.oid;
         });
-        var deferred = Ext.create('Deft.Deferred');
-        var oidsFilter = Rally.data.wsapi.Filter.or(_.map(portfolioOids, function (oid) {
-            return {
-                property: 'ObjectID',
-                value: oid
-            }
-        }));
-        var childFilter = Rally.data.wsapi.Filter.or(_.map(portfolioOids, function (oid) {
-            return {
-                property: 'Parent',
-                value: oid
-            }
-        }));
-        var filters = [
-            {
-                property: '_TypeHierarchy',
-                value: 'PortfolioItem/Feature'
-            },
-            {
-                property: '__At',
-                value: 'current'
-            },
-            {
-                property: '_ItemHierarchy',
-                operator: 'in',
-                value: portfolioOids
-            }
-        ];
 
-        // User has selected individual portfolio items. Filter out features
-        // not in those PIs
-
-        Ext.create('Rally.data.lookback.SnapshotStore', {
-            autoLoad: true,
-            fetch: this.featureFields,
-            filters: filters,
-            listeners: {
-                load: function (store, data, success) {
-                    if (!success) {
-                        deferred.reject("Unable to load features");
-                    }
-
-                    deferred.resolve(data);
+        if (portfolioItems.length < 1) {
+            deferred.reject("No portfolio items set");
+        } else {
+            var oidsFilter = Rally.data.wsapi.Filter.or(_.map(portfolioOids, function (oid) {
+                return {
+                    property: 'ObjectID',
+                    value: oid
                 }
-            },
-        });
-        return deferred.promise;
+            }));
+            var childFilter = Rally.data.wsapi.Filter.or(_.map(portfolioOids, function (oid) {
+                return {
+                    property: 'Parent',
+                    value: oid
+                }
+            }));
+            var filters = [
+                {
+                    property: '_TypeHierarchy',
+                    value: 'PortfolioItem/Feature'
+                },
+                {
+                    property: '__At',
+                    value: 'current'
+                },
+                {
+                    property: '_ItemHierarchy',
+                    operator: 'in',
+                    value: portfolioOids
+                }
+            ];
+
+            // User has selected individual portfolio items. Filter out features
+            // not in those PIs
+
+            Ext.create('Rally.data.lookback.SnapshotStore', {
+                autoLoad: true,
+                fetch: this.featureFields,
+                filters: filters,
+                listeners: {
+                    load: function (store, data, success) {
+                        if (!success || data.length < 1) {
+                            deferred.reject("Unable to load feature IDs " + portfolioOids);
+                        } else {
+                            deferred.resolve(data);
+                        }
+                    }
+                }
+            });
+        }
+        return deferred.getPromise();
     },
 
 
@@ -248,7 +255,7 @@ Ext.define("com.ca.technicalservices.Burnupdown", {
         var iterationOids = _.filter(oids);
         if (!iterationOids.length) {
             // No iterations specified, nothing to do
-            deferred.resolve(iterationData);
+            deferred.reject("No iterations set");
         } else {
             Ext.create('Rally.data.wsapi.Store', {
                 autoLoad: true,
@@ -281,11 +288,12 @@ Ext.define("com.ca.technicalservices.Burnupdown", {
             });
         }
 
-        return deferred.promise;
+        return deferred.getPromise();
     },
 
     launch: function () {
         // TODO (tj) run stories and features calls in parallel if possible
+        // TODO (tj) is there a way to use a single otherwise handler for errors with Deft?
         var features, stories, dates
 
         this._getFeatures()
@@ -294,6 +302,9 @@ Ext.define("com.ca.technicalservices.Burnupdown", {
                 success: function (featuresData) {
                     features = featuresData;
                     return this._getDates(features);
+                },
+                failure: function (msg) {
+                    Ext.Msg.alert("Error loading features", msg);
                 }
             })
             .then({
@@ -301,53 +312,63 @@ Ext.define("com.ca.technicalservices.Burnupdown", {
                 success: function (datesData) {
                     dates = datesData;
                     return this._getCurrentStories();
+                },
+                failure: function (msg) {
+                    Ext.Msg.alert("Error loading feature dates", msg);
                 }
             })
             .then({
                 scope: this,
                 success: function (storiesData) {
                     stories = storiesData;
-                    var iterationOids = stories.map(function (story) {
-                        return story.get('Iteration');
-                    });
-                    return this._getIterations(iterationOids);
+                    if ( stories && stories.length ) {
+                        var iterationOids = stories.map(function (story) {
+                            return story.get('Iteration');
+                        });
+                        return this._getIterations(iterationOids);
+                    }
                 },
                 failure: function (msg) {
-                    Ext.Msg.alert(msg);
+                    Ext.Msg.alert("Error loading user stories", msg);
                 }
             })
             .then({
                 scope: this,
                 success: function (iterationData) {
-                    var storyOids = stories.map(function (story) {
-                        return story.get('ObjectID');
-                    });
+                    if ( stories && stories.length ) {
+                        var storyOids = stories.map(function (story) {
+                            return story.get('ObjectID');
+                        });
 
-                    // Use the earliest actual start if there is one, otherwise use the earliest planned,
-                    // otherwise fall back on today
-                    var startDate;
-                    if (dates.earliestActualStartDate) {
-                        startDate = dates.earliestActualStartDate;
-                    } else {
-                        startDate = dates.earliestPlannedStartDate || new Date();
+                        // Use the earliest actual start if there is one, otherwise use the earliest planned,
+                        // otherwise fall back on today
+                        var startDate;
+                        if (dates.earliestActualStartDate) {
+                            startDate = dates.earliestActualStartDate;
+                        } else {
+                            startDate = dates.earliestPlannedStartDate || new Date();
+                        }
+
+                        var endDate = dates.latestPlannedEndDate || new Date();
+
+                        this.add({
+                            xtype: 'rallychart',
+                            storeType: 'Rally.data.lookback.SnapshotStore',
+                            storeConfig: this._getStoreConfig(storyOids),
+                            calculatorType: 'com.ca.technicalservices.Burnupdown.Calculator',
+                            calculatorConfig: {
+                                granularity: 'hour',
+                                startDate: startDate,
+                                endDate: endDate,
+                                iterationData: iterationData,
+                                features: features
+                            },
+                            chartConfig: this._getChartConfig()
+                        });
                     }
-
-                    var endDate = dates.latestPlannedEndDate || new Date();
-
-                    this.add({
-                        xtype: 'rallychart',
-                        storeType: 'Rally.data.lookback.SnapshotStore',
-                        storeConfig: this._getStoreConfig(storyOids),
-                        calculatorType: 'com.ca.technicalservices.Burnupdown.Calculator',
-                        calculatorConfig: {
-                            granularity: 'hour',
-                            startDate: startDate,
-                            endDate: endDate,
-                            iterationData: iterationData,
-                            features: features
-                        },
-                        chartConfig: this._getChartConfig()
-                    });
+                },
+                failure: function (msg) {
+                    Ext.Msg.alert("Error loading Iterations", msg);
                 }
             });
     },
@@ -393,21 +414,22 @@ Ext.define("com.ca.technicalservices.Burnupdown", {
                 load: function (store, data, success) {
                     if (!success || data.length < 1) {
                         deferred.reject("Unable to load release");
+                    } else {
+                        var result = initialValue;
+                        var release = data[0];
+                        result.earliestPlannedStartDate =
+                            this._laterDate(release.get('ReleaseStartDate'), initialValue.earliestPlannedStartDate);
+                        result.earliestActualStartDate =
+                            this._laterDate(release.get('ReleaseStartDate'), initialValue.earliestActualStartDate);
+                        result.latestPlannedEndDate =
+                            this._laterDate(release.get('ReleaseDate'), initialValue.latestPlannedEndDate);
+                        deferred.resolve(result);
                     }
-                    var result = initialValue;
-                    var release = data[0];
-                    result.earliestPlannedStartDate =
-                        this._laterDate(release.get('ReleaseStartDate'), initialValue.earliestPlannedStartDate);
-                    result.earliestActualStartDate =
-                        this._laterDate(release.get('ReleaseStartDate'), initialValue.earliestActualStartDate);
-                    result.latestPlannedEndDate =
-                        this._laterDate(release.get('ReleaseDate'), initialValue.latestPlannedEndDate);
-                    deferred.resolve(result);
                 }
             }
         });
 
-        return deferred.promise;
+        return deferred.getPromise();
     },
 
     _getFeatureDates: function (features, initialValue) {

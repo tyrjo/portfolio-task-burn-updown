@@ -85,8 +85,9 @@ Ext.define("com.ca.technicalservices.Burnupdown", {
         ];
     },
 
-    _getCurrentStories: function () {
+    _getCurrentStories: function (features) {
         var deferred = Ext.create('Deft.Deferred');
+        var featureOids = _.pluck(features, 'ObjectID');
         var filters = [
             {
                 property: '_TypeHierarchy',
@@ -99,29 +100,19 @@ Ext.define("com.ca.technicalservices.Burnupdown", {
             {
                 property: '__At',
                 value: 'current'
+            },
+            {
+                property: '_ItemHierarchy',
+                operator: 'in',
+                value: featureOids  // Filter out stories not in the selected features
             }
         ];
 
-        if (SettingsUtils.isReleaseScope()) {
-            // User has selected a release. Filter out stories not in that release.
-            filters.push({
-                property: 'Release',
-                value: SettingsUtils.getSelectedRelease()
-            });
-        } else {
-            // User has selected individual portfolio items. Filter out stories
-            // not in those PIs
-            var itemOids = this._getPortfolioItems().map(function (item) {
-                return item.oid;
-            });
-            filters.push({
-                property: '_ItemHierarchy',
-                operator: 'in',
-                value: itemOids
-            });
-        }
+        var queryContext = this.getContext().getDataContext();
+        queryContext.projectScopeDown = true;
         Ext.create('Rally.data.lookback.SnapshotStore', {
             autoLoad: true,
+            //context: queryContext,
             fetch: ['ObjectID', 'Iteration'],
             filters: filters,
             listeners: {
@@ -129,7 +120,7 @@ Ext.define("com.ca.technicalservices.Burnupdown", {
                     if (!success || data.length < 1) {
                         deferred.reject("Unable to load user stories");
                     } else {
-                        deferred.resolve(data);
+                        deferred.resolve(_.pluck(data, 'raw'));
                     }
                 }
             },
@@ -148,10 +139,8 @@ Ext.define("com.ca.technicalservices.Burnupdown", {
         return promise.then({
             scope: this,
             success: function (data) {
-                return _.map(data, function (item) {
-                    // TODO (tj) avoid use of raw so that get() is available
-                    return item.raw;
-                });
+                // Get an object of just the fetched values
+                return _.pluck(data, 'raw');
             }
         })
 
@@ -174,8 +163,8 @@ Ext.define("com.ca.technicalservices.Burnupdown", {
                 listeners: {
                     scope: this,
                     load: function (store, data, success) {
-                        if (!success) {
-                            deferred.reject("Unable to load features from release " + release.Name);
+                        if (!success || data.length < 1) {
+                            deferred.reject("Unable to load features from release " + release);
                         } else {
                             deferred.resolve(data);
                         }
@@ -195,7 +184,7 @@ Ext.define("com.ca.technicalservices.Burnupdown", {
             return item.oid;
         });
 
-        if (portfolioItems.length < 1) {
+        if (portfolioOids.length < 1) {
             deferred.reject("No portfolio items set");
         } else {
             var oidsFilter = Rally.data.wsapi.Filter.or(_.map(portfolioOids, function (oid) {
@@ -252,37 +241,44 @@ Ext.define("com.ca.technicalservices.Burnupdown", {
     _getIterations: function (oids) {
         var iterationData = Ext.create('com.ca.technicalservices.Burnupdown.IterationData');
         var deferred = Ext.create('Deft.Deferred');
-        var iterationOids = _.filter(oids);
+
+        var iterationOids = _.filter(oids); // filter any blank ids
+        if (iterationOids.length != oids.length) {
+            console.warn("Iteration missing for at least one story snapshot.")
+        }
+
         if (!iterationOids.length) {
             // No iterations specified, nothing to do
             deferred.reject("No iterations set");
         } else {
+            var queries = iterationOids.map(function (oid) {
+                return {
+                    property: 'Iteration.ObjectID',
+                    value: oid
+                };
+            });
+            var filter = Rally.data.wsapi.Filter.or(queries);
+            var dataContext = this.getContext().getDataContext();
+            dataContext.projectScopeDown = true;
             Ext.create('Rally.data.wsapi.Store', {
                 autoLoad: true,
                 model: 'UserIterationCapacity',
+                context: dataContext,
                 fetch: this.userIterationCapacityFields,
                 groupField: 'Iteration',    // Required, but ignored because of getGroupString
                 getGroupString: function (instance) {
                     return instance.data.Iteration._ref;
                 },
-                filters: Rally.data.wsapi.Filter.or(iterationOids
-                    .filter(function (oid) {
-                        return oid;
-                    })
-                    .map(function (oid) {
-                        return {
-                            property: 'Iteration.ObjectID',
-                            value: oid
-                        }
-                    })),
+                filters: filter,
                 listeners: {
                     scope: this,
                     load: function (store, data, success) {
-                        if (!success) {
-                            deferred.reject("Unable to load iterations");
+                        if (!success || data.length < 1) {
+                            deferred.reject("Unable to load user iteration capacities for iterations " + iterationOids);
+                        } else {
+                            iterationData.collectIterations(store);
+                            deferred.resolve(iterationData);
                         }
-                        iterationData.collectIterations(store);
-                        deferred.resolve(iterationData);
                     }
                 }
             });
@@ -294,7 +290,7 @@ Ext.define("com.ca.technicalservices.Burnupdown", {
     launch: function () {
         // TODO (tj) run stories and features calls in parallel if possible
         // TODO (tj) is there a way to use a single otherwise handler for errors with Deft?
-        var features, stories, dates
+        var features, stories, dates;
 
         this._getFeatures()
             .then({
@@ -302,75 +298,60 @@ Ext.define("com.ca.technicalservices.Burnupdown", {
                 success: function (featuresData) {
                     features = featuresData;
                     return this._getDates(features);
-                },
-                failure: function (msg) {
-                    Ext.Msg.alert("Error loading features", msg);
                 }
             })
             .then({
                 scope: this,
                 success: function (datesData) {
                     dates = datesData;
-                    return this._getCurrentStories();
-                },
-                failure: function (msg) {
-                    Ext.Msg.alert("Error loading feature dates", msg);
+                    return this._getCurrentStories(features);
                 }
             })
             .then({
                 scope: this,
                 success: function (storiesData) {
                     stories = storiesData;
-                    if ( stories && stories.length ) {
-                        var iterationOids = stories.map(function (story) {
-                            return story.get('Iteration');
-                        });
-                        return this._getIterations(iterationOids);
-                    }
-                },
-                failure: function (msg) {
-                    Ext.Msg.alert("Error loading user stories", msg);
+                    var iterationOids = _.pluck(_.unique(stories, 'Iteration'), 'Iteration');
+                    return this._getIterations(iterationOids);
                 }
             })
             .then({
                 scope: this,
                 success: function (iterationData) {
-                    if ( stories && stories.length ) {
-                        var storyOids = stories.map(function (story) {
-                            return story.get('ObjectID');
-                        });
+                    var storyOids = _.pluck(stories, 'ObjectID');
 
-                        // Use the earliest actual start if there is one, otherwise use the earliest planned,
-                        // otherwise fall back on today
-                        var startDate;
-                        if (dates.earliestActualStartDate) {
-                            startDate = dates.earliestActualStartDate;
-                        } else {
-                            startDate = dates.earliestPlannedStartDate || new Date();
-                        }
-
-                        var endDate = dates.latestPlannedEndDate || new Date();
-
-                        this.add({
-                            xtype: 'rallychart',
-                            storeType: 'Rally.data.lookback.SnapshotStore',
-                            storeConfig: this._getStoreConfig(storyOids),
-                            calculatorType: 'com.ca.technicalservices.Burnupdown.Calculator',
-                            calculatorConfig: {
-                                granularity: 'hour',
-                                startDate: startDate,
-                                endDate: endDate,
-                                iterationData: iterationData,
-                                features: features
-                            },
-                            chartConfig: this._getChartConfig()
-                        });
+                    // Use the earliest actual start if there is one, otherwise use the earliest planned,
+                    // otherwise fall back on today
+                    var startDate;
+                    if (dates.earliestActualStartDate) {
+                        startDate = dates.earliestActualStartDate;
+                    } else {
+                        startDate = dates.earliestPlannedStartDate || new Date();
                     }
-                },
-                failure: function (msg) {
-                    Ext.Msg.alert("Error loading Iterations", msg);
+
+                    var endDate = dates.latestPlannedEndDate || new Date();
+
+                    this.add({
+                        xtype: 'rallychart',
+                        storeType: 'Rally.data.lookback.SnapshotStore',
+                        storeConfig: this._getStoreConfig(storyOids),
+                        calculatorType: 'com.ca.technicalservices.Burnupdown.Calculator',
+                        calculatorConfig: {
+                            granularity: 'hour',
+                            startDate: startDate,
+                            endDate: endDate,
+                            iterationData: iterationData,
+                            features: features
+                        },
+                        chartConfig: this._getChartConfig()
+                    });
                 }
-            });
+            })
+            .otherwise({
+                fn: function (msg) {
+                    Ext.Msg.alert('Error', msg);
+                }
+            })
     },
 
     _getDates: function (features) {
@@ -413,7 +394,7 @@ Ext.define("com.ca.technicalservices.Burnupdown", {
                 scope: this,
                 load: function (store, data, success) {
                     if (!success || data.length < 1) {
-                        deferred.reject("Unable to load release");
+                        deferred.reject("Unable to load release " + releaseRef);
                     } else {
                         var result = initialValue;
                         var release = data[0];
@@ -489,16 +470,6 @@ Ext.define("com.ca.technicalservices.Burnupdown", {
             context: this.getContext().getDataContext(),
             limit: Infinity,
         };
-    },
-
-    _getPortfolioItems: function () {
-        var items = [];
-        try {
-            items = SettingsUtils.getPortfolioItems();
-        } catch (e) {
-            // ignore failures
-        }
-        return items;
     },
 
     /**

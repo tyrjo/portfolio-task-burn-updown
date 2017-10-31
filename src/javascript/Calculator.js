@@ -164,6 +164,7 @@
         },
 
         _getDataForFeature: function (feature, snapshot, attribute) {
+            // TODO (tj) Add to readme that 'Feature' name may vary if Portfolio item type
             if (snapshot.Feature === feature.ObjectID) {
                 return snapshot[attribute];
             } else {
@@ -177,7 +178,7 @@
 
         _getFeaturesInitialHourEstimates: function () {
             return _.reduce(this.features, function (sum, feature) {
-                return sum + feature.c_InitialHourEstimate;
+                return sum + (feature.c_InitialHourEstimate || 0);
             }, 0);
         },
 

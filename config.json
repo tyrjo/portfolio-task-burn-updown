@@ -6,8 +6,12 @@
   "javascript": [
     "src/javascript/settings/Utils.js",
     "src/javascript/settings/PortfolioItemPicker.js",
+    "src/javascript/StoriesManager.js",
+    "src/javascript/FeatureManager.js",
+    "src/javascript/UserIterationCapacitiesManager.js",
+    "src/javascript/DateRange.js",
+    "src/javascript/DateManager.js",
     "src/javascript/Calculator.js",
-    "src/javascript/IterationData.js",
     "src/javascript/utils/__ts-info-link.js",
     "src/javascript/utils/__ts-logger.js",
     "src/javascript/app.js"

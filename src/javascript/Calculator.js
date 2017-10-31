@@ -18,7 +18,7 @@
     Ext.define('com.ca.technicalservices.Burnupdown.Calculator', {
         extend: 'Rally.data.lookback.calculator.TimeSeriesCalculator',
         config: {
-            iterationData: undefined
+            iterationCapacitiesManager: undefined
         },
 
         remainingIdealTodo: undefined,
@@ -43,7 +43,6 @@
         constructor: function (config) {
             this.initConfig(config);
             this.callParent(arguments);
-            //this._getTotalCapacityForTick = this._getTotalCapacityForTick.bind(this);
             this._getDailyCapacityForTick = this._getDailyCapacityForTick.bind(this);
             this._getCapacityBurndownForTick = this._getCapacityBurndownForTick.bind(this);
             this._getFeatureName = this._getFeatureName.bind(this);
@@ -56,11 +55,6 @@
                 return accumulator;
             }, {});
         },
-
-        prepareChartData: function (store) {
-            return this.callParent(arguments);
-        },
-
 
         runCalculation: function (snapshots) {
             var result = this.callParent(arguments);
@@ -142,15 +136,8 @@
             return date_index;
         },
 
-        /*
-        _getTotalCapacityForTick: function (snapshot) {
-            var capacities = this.iterationData.getCapacitiesForDateString(snapshot.tick);
-            return capacities.total;
-        },
-        */
-
         _getDailyCapacityForTick: function (snapshot) {
-            var capacities = this.iterationData.getCapacitiesForDateString(snapshot.tick);
+            var capacities = this.iterationCapacitiesManager.getCapacitiesForDateString(snapshot.tick);
             return capacities.daily;
         },
 
@@ -174,25 +161,6 @@
                 result = Math.max(0, priorSnapshot[METRIC_NAME_IDEAL_CAPACITY_BURNDOWN] - currentCapacity);
             }
             return result;
-
-            /*
-            var priorCapacity = 0;
-            if (index > 0 && seriesData[index - 1][METRIC_NAME_DAILY_CAPACITY]) {
-                priorCapacity = seriesData[index - 1][METRIC_NAME_DAILY_CAPACITY]
-            }
-
-            if (this.remainingIdealTodo === undefined) {
-                var featureName = this.featureNameMap[snapshot.ObjectID];
-                if (snapshot[featureName + ' ' + METRIC_NAME_TODO]) {
-                    // Found the first To Do entry for this chart
-                    this.remainingIdealTodo = snapshot[featureName + ' ' + METRIC_NAME_TODO];
-                }
-            } else {
-                this.remainingIdealTodo = Math.max(this.remainingIdealTodo - priorCapacity, 0);
-            }
-
-            return this.remainingIdealTodo || 0;
-            */
         },
 
         _getDataForFeature: function (feature, snapshot, attribute) {
@@ -411,18 +379,6 @@
          */
         getDerivedFieldsAfterSummary: function () {
             return [
-                /*
-                {
-                    field: 'TaskRemainingTotal',
-                    as: METRIC_NAME_TOTAL_TODO,
-                    f: 'sum'
-                },
-                {
-                    field: 'TaskActualTotal',
-                    as: METRIC_NAME_TOTAL_ACTUAL,
-                    f: 'sum'
-                },
-                */
                 {
                     as: METRIC_NAME_IDEAL_CAPACITY_BURNDOWN,
                     f: this._getCapacityBurndownForTick,

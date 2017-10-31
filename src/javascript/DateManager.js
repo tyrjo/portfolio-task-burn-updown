@@ -42,12 +42,13 @@
         // TODO (tj) refactor to move date structure to an object
         function _getDatesFromRelease(releaseRef, initialValue) {
             var deferred = Ext.create('Deft.Deferred');
-
+            var dataContext = Rally.getApp().getContext().getDataContext();
+            dataContext.projectScopeUp = true;
             Ext.create('Rally.data.wsapi.Store', {
                 autoLoad: true,
                 model: 'Release',
+                context: dataContext,
                 fetch: releaseFields,
-
                 filters: [
                     {
                         property: 'ObjectID',

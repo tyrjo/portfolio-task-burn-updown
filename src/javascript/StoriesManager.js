@@ -5,11 +5,11 @@
 
         return {
             config: {
-                storiesFields: ['ObjectID', 'Iteration']
+                storiesFields: ['ObjectID', 'Iteration', 'Project']
             },
-            constructor: function(config) {
-              this.initConfig(config);
-              return this;
+            constructor: function (config) {
+                this.initConfig(config);
+                return this;
             },
             getCurrentStories: _getCurrentStories
         };
@@ -17,6 +17,7 @@
         function _getCurrentStories(features) {
             var deferred = Ext.create('Deft.Deferred');
             var featureOids = _.pluck(features, 'ObjectID');
+            var dataContext = Rally.getApp().getContext().getDataContext();
             var filters = [
                 {
                     property: '_TypeHierarchy',
@@ -34,6 +35,10 @@
                     property: '_ItemHierarchy',
                     operator: 'in',
                     value: featureOids  // Filter out stories not in the selected features
+                },
+                {
+                    property: '_ProjectHierarchy',
+                    value: Rally.util.Ref.getOidFromRef(dataContext.project) // Filter out stories that don't belong to current project or its children
                 }
             ];
 
@@ -41,6 +46,7 @@
                 autoLoad: true,
                 fetch: this.getStoriesFields(),
                 filters: filters,
+                limit: Infinity,
                 listeners: {
                     load: function (store, data, success) {
                         if (!success || data.length < 1) {

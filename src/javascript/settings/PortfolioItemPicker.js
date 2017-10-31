@@ -18,7 +18,6 @@
             'Rally.ui.dialog.ChooserDialog',
             'Rally.data.wsapi.Store',
             'SettingsUtils'
-
         ],
 
         mixins: [

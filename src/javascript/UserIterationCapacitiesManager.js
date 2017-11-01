@@ -18,12 +18,13 @@
             config: {
                 workDays: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
             },
-            constructor: function(config) {
-              this.initConfig(config);
-              return this;
+            constructor: function (config) {
+                this.initConfig(config);
+                return this;
             },
             loadCapacitiesForIterations: _loadCapacitiesForIterations,
-            getCapacitiesForDateString: _getCapacitiesForDateString,
+            loadCapacitiesForDates: _loadCapacitiesForDates,
+            getCapacitiesForDateString: _getCapacitiesForDateString
         };
 
 
@@ -93,6 +94,52 @@
             };
         }
 
+        function _loadCapacitiesForDates(startDate, endDate) {
+            var deferred = Ext.create('Deft.Deferred');
+            var filter = Rally.data.wsapi.Filter.and([
+                {
+                    property: 'Iteration.StartDate',
+                    operator: '<',
+                    value: endDate.toISOString()
+                },
+                {
+                    property: 'Iteration.EndDate',
+                    operator: '>',
+                    value: startDate.toISOString()
+                }
+            ]);
+            Ext.create('Rally.data.wsapi.Store', {
+                autoLoad: true,
+                model: 'UserIterationCapacity',
+                limit: Infinity,
+                context: {
+                    projectScopeDown: true
+                },
+                fetch: userIterationCapacityFields,
+                groupField: 'Iteration',    // Required, but ignored because of getGroupString
+                getGroupString: function (instance) {
+                    return instance.data.Iteration._ref;
+                },
+                filters: filter,
+                listeners: {
+                    scope: this,
+                    load: function (store, data, success) {
+                        if (!success) {
+                            deferred.reject("Unable to load user iteration capacities for date range " +
+                                startDate + " to " + endDate);
+                        } else {
+                            if (data.length < 1) {
+                                console.warn("No user iteration capacities found");
+                            }
+                            _collectIterations.call(this, store);
+                            deferred.resolve();
+                        }
+                    }
+                }
+            });
+            return deferred.getPromise();
+        }
+
         function _loadCapacitiesForIterations(oids) {
             var deferred = Ext.create('Deft.Deferred');
             var iterationOids = _.filter(oids); // filter any blank ids
@@ -112,14 +159,14 @@
                     };
                 });
                 var filter = Rally.data.wsapi.Filter.or(queries);
-                var dataContext = Rally.getApp().getContext().getDataContext();
-                dataContext.projectScopeDown = true;
 
                 Ext.create('Rally.data.wsapi.Store', {
                     autoLoad: true,
                     model: 'UserIterationCapacity',
                     limit: Infinity,
-                    context: dataContext,
+                    context: {
+                        projectScopeDown: true
+                    },
                     fetch: userIterationCapacityFields,
                     groupField: 'Iteration',    // Required, but ignored because of getGroupString
                     getGroupString: function (instance) {
@@ -132,7 +179,7 @@
                             if (!success) {
                                 deferred.reject("Unable to load user iteration capacities for iterations " + iterationOids);
                             } else {
-                                if ( data.length < 1 ) {
+                                if (data.length < 1) {
                                     console.warn("No user iteration capacities found");
                                 }
                                 _collectIterations.call(this, store);

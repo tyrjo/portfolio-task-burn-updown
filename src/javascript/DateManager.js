@@ -19,10 +19,10 @@
                 this.initConfig(config);
                 return this;
             },
-            getDates: _getDates
+            getDateRange: _getDateRange
         };
 
-        function _getDates(features) {
+        function _getDateRange(features) {
             var initialValue = Ext.create('com.ca.technicalservices.Burnupdown.DateRange');
             var result = _getDatesFromFeatures(features, initialValue);
 
@@ -35,11 +35,10 @@
         }
 
         function _getDatesFromRelease(release, initialValue) {
-            var result = initialValue;
-            result.setEarliestPlannedStartDate(_laterDate(release.ReleaseStartDate, initialValue.getEarliestPlannedStartDate()));
-            result.setEarliestActualStartDate(_laterDate(release.ReleaseStartDate, initialValue.getEarliestActualStartDate()));
-            result.setLatestPlannedEndDate(_laterDate(release.ReleaseDate, initialValue.getLatestPlannedEndDate()));
-            return result;
+            var plannedStartDate = release.ReleaseStartDate ? Ext.Date.parse(release.ReleaseStartDate, 'c') : undefined;
+            var plannedEndDate = release.ReleaseDate ? Ext.Date.parse(release.ReleaseDate, 'c') : undefined;
+            initialValue.addDates(plannedStartDate, plannedStartDate, plannedEndDate);
+            return initialValue;
         }
 
         function _getDatesFromFeatures(features, initialValue) {
@@ -48,34 +47,11 @@
                 var actualStartDate = feature.ActualStartDate ? Ext.Date.parse(feature.ActualStartDate, 'c') : undefined;
                 var plannedEndDate = feature.PlannedEndDate ? Ext.Date.parse(feature.PlannedEndDate, 'c') : undefined;
 
-                accumulator.setEarliestPlannedStartDate(_earlierDate(plannedStartDate, accumulator.getEarliestPlannedStartDate()));
-                accumulator.setEarliestActualStartDate(_earlierDate(actualStartDate, accumulator.getEarliestActualStartDate()));
-                accumulator.setLatestPlannedEndDate(_laterDate(plannedEndDate, accumulator.getLatestPlannedEndDate()));
+                accumulator.addDates(plannedStartDate, actualStartDate, plannedEndDate);
 
                 return accumulator;
-
             }, initialValue);
 
-            return result;
-        }
-
-        function _earlierDate(d1, d2) {
-            var result = d2;
-            if (d1) {
-                if (!d2 || (d1 < d2)) {
-                    result = d1;
-                }
-            }
-            return result;
-        }
-
-        function _laterDate(d1, d2) {
-            var result = d2;
-            if (d1) {
-                if (!d2 || (d1 > d2)) {
-                    result = d1;
-                }
-            }
             return result;
         }
     }());

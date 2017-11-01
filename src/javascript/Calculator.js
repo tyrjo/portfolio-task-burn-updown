@@ -86,7 +86,7 @@
                 metricNames[METRIC_NAME_PREFIX_TODO + feature.Name] = {
                     stack: METRIC_NAME_PREFIX_TODO,
                     color: Ext.draw.Color.toHex(colors[colorIndex]),
-                    borderRadius: 5
+                    borderRadius: 10
                 };
                 metricNames[METRIC_NAME_PREFIX_ACTUAL + feature.Name] = {
                     stack: METRIC_NAME_PREFIX_ACTUAL,

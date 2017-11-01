@@ -11,8 +11,9 @@
             SCOPE_INDIVIDUAL_PORTFOLIO_ITEMS: 'individual',
             SCOPE_RELEASE_PORTFOLIO_ITEMS: 'release',
 
-            setPortfolioItems: function (portfolioItems) {
-                var result = portfolioItems.map(function (item) {
+            createPortfolioItemsSettings: function (portfolioItems) {
+                var result = {};
+                var piSettings = portfolioItems.map(function (item) {
                     return {
                         _ref: item._ref,
                         oid: Rally.util.Ref.getOidFromRef(item._ref),
@@ -22,22 +23,49 @@
                     }
                 });
 
-                result[this.SETTING_NAME_PORTFOLIO_ITEMS] = JSON.stringify(result);
-                Rally.getApp().updateSettingsValues({
-                    settings: result,
-                });
+                result[this.SETTING_NAME_PORTFOLIO_ITEMS] = JSON.stringify(piSettings);
+                return result;
+            },
+
+            createReleaseSettings: function (release) {
+                var result = {};
+                var releaseSettings = {};
+                if (release) {
+                    releaseSettings = {
+                        _ref: release.get('_ref'),
+                        ObjectID: Rally.util.Ref.getOidFromRef(release.get('_ref')),
+                        Name: release.get('Name'),
+                        ReleaseStartDate: release.get('ReleaseStartDate'),
+                        ReleaseDate: release.get('ReleaseDate')
+                    };
+                }
+                result[this.SETTING_NAME_RELEASE] = JSON.stringify(releaseSettings);
                 return result;
             },
 
             getPortfolioItems: function () {
-                return JSON.parse(Rally.getApp().getSetting(this.SETTING_NAME_PORTFOLIO_ITEMS));
+                var piSetting = Rally.getApp().getSetting(this.SETTING_NAME_PORTFOLIO_ITEMS) || '[]';
+                var result;
+                try {
+                    result = JSON.parse(piSetting);
+                } catch (e) {
+                    //ignored
+                }
+                return result;
             },
 
             getRelease: function () {
-                return Rally.getApp().getSetting(this.SETTING_NAME_RELEASE);
+                var releaseSetting = Rally.getApp().getSetting(this.SETTING_NAME_RELEASE) || '{}';
+                var result;
+                try {
+                    result = JSON.parse(releaseSetting);
+                } catch (e) {
+                    //ignored
+                }
+                return result;
             },
 
-            getScope: function() {
+            getScope: function () {
                 return Rally.getApp().getSetting(this.SETTING_NAME_SCOPE);
             },
 

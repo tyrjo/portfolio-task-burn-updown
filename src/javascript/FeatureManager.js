@@ -41,25 +41,32 @@
             var deferred = Ext.create('Deft.Deferred');
 
             if (release) {
-                var queryContext = Rally.getApp().getContext().getDataContext();
-                queryContext.projectScopeUp = true; // TODO (tj) can just pass hash to merge
-                queryContext.projectScopeDown = true;
                 Ext.create('Rally.data.wsapi.Store', {
                     autoLoad: true,
                     model: 'PortfolioItem/Feature', // TODO (tj) might not need /Feature because only bottom PI can be associated with Release?
+                    context: {
+                      projectScopeUp: true
+                    },
                     limit: Infinity,
-                    context: queryContext,
                     fetch: this.getFeatureFields(),
                     filters: [
                         {
-                            property: 'Release',    // TODO (tj) use Release.Name, etc
-                            value: release
+                            property: 'Release.Name',
+                            value: release.Name
+                        },
+                        {
+                            property: 'Release.ReleaseStartDate',
+                            value: release.ReleaseStartDate
+                        },
+                        {
+                            property: 'Release.ReleaseDate',
+                            value: release.ReleaseDate
                         }
                     ],
                     listeners: {
                         load: function (store, data, success) {
                             if (!success || data.length < 1) {
-                                deferred.reject("Unable to load features from release " + release);
+                                deferred.reject("Unable to load features from release " + release.Name);
                             } else {
                                 deferred.resolve(data);
                             }

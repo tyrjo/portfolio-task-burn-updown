@@ -15,63 +15,31 @@
             require: [
                 'com.ca.technicalservices.Burnupdown.DateRange'
             ],
-            constructor: function(config) {
-              this.initConfig(config);
-              return this;
+            constructor: function (config) {
+                this.initConfig(config);
+                return this;
             },
             getDates: _getDates
         };
 
         function _getDates(features) {
-            var result;
-
             var initialValue = Ext.create('com.ca.technicalservices.Burnupdown.DateRange');
-
-            var featureDates = _getDatesFromFeatures(features, initialValue);
+            var result = _getDatesFromFeatures(features, initialValue);
 
             if (SettingsUtils.isReleaseScope()) {
-                // Use release StartDate or Pis actual start dates and ReleaseDate
-                result = _getDatesFromRelease(SettingsUtils.getRelease(), featureDates);
-            } else {
-                result = Deft.promise.Promise.when(featureDates);
+                // Merge release dates with the feature dates
+                result = _getDatesFromRelease(SettingsUtils.getRelease(), result);
             }
 
             return result;
         }
 
-        // TODO (tj) refactor to move date structure to an object
-        function _getDatesFromRelease(releaseRef, initialValue) {
-            var deferred = Ext.create('Deft.Deferred');
-            var dataContext = Rally.getApp().getContext().getDataContext();
-            dataContext.projectScopeUp = true;
-            Ext.create('Rally.data.wsapi.Store', {
-                autoLoad: true,
-                model: 'Release',
-                context: dataContext,
-                fetch: releaseFields,
-                filters: [
-                    {
-                        property: 'ObjectID',
-                        value: Rally.util.Ref.getOidFromRef(releaseRef)
-                    }
-                ],
-                listeners: {
-                    load: function (store, data, success) {
-                        if (!success || data.length < 1) {
-                            deferred.reject("Unable to load release " + releaseRef);
-                        } else {
-                            var result = initialValue;
-                            var release = data[0];
-                            result.setEarliestPlannedStartDate(_laterDate(release.get('ReleaseStartDate'), initialValue.getEarliestPlannedStartDate()));
-                            result.setEarliestActualStartDate(_laterDate(release.get('ReleaseStartDate'), initialValue.getEarliestActualStartDate()));
-                            result.setLatestPlannedEndDate(_laterDate(release.get('ReleaseDate'), initialValue.getLatestPlannedEndDate()));
-                            deferred.resolve(result);
-                        }
-                    }
-                }
-            });
-
-            return deferred.getPromise();
+        function _getDatesFromRelease(release, initialValue) {
+            var result = initialValue;
+            result.setEarliestPlannedStartDate(_laterDate(release.ReleaseStartDate, initialValue.getEarliestPlannedStartDate()));
+            result.setEarliestActualStartDate(_laterDate(release.ReleaseStartDate, initialValue.getEarliestActualStartDate()));
+            result.setLatestPlannedEndDate(_laterDate(release.ReleaseDate, initialValue.getLatestPlannedEndDate()));
+            return result;
         }
 
         function _getDatesFromFeatures(features, initialValue) {

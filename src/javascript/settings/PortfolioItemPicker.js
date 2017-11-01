@@ -28,6 +28,8 @@
 
         portfolioItemScope: SettingsUtils.SCOPE_RELEASE_PORTFOLIO_ITEMS,
 
+        release: undefined,
+
         items: [
             {
                 xtype: 'radiogroup',
@@ -54,7 +56,8 @@
                 items: [{
                     xtype: 'rallyreleasecombobox',
                     itemId: RELEASE_PICKER_ITEMID,
-                    name: SettingsUtils.SETTING_NAME_RELEASE
+                    name: SettingsUtils.SETTING_NAME_RELEASE,
+                    submitValue: false
                 }]
             },
             {
@@ -123,7 +126,15 @@
         },
 
         _configureReleasePicker: function () {
-            this.down('#' + RELEASE_PICKER_ITEMID).setValue(SettingsUtils.getRelease())
+            var picker = this.down('#' + RELEASE_PICKER_ITEMID);
+            picker.setValue(SettingsUtils.getRelease()._ref);
+            picker.on('change', function(element) {
+                this._onReleaseChange(element.getRecord());
+            }, this);
+        },
+
+        _onReleaseChange: function(release) {
+            this.release = release;
         },
 
         _configureButton: function () {
@@ -348,7 +359,7 @@
 
             switch (this.portfolioItemScope) {
                 case SettingsUtils.SCOPE_RELEASE_PORTFOLIO_ITEMS:
-                    //returnObject.portfolioItemScope = this.portfolioItemScope;
+                    _.merge(returnObject, SettingsUtils.createReleaseSettings(this.release));
                     break;
                 case SettingsUtils.SCOPE_INDIVIDUAL_PORTFOLIO_ITEMS:
                 default:
@@ -364,9 +375,7 @@
                         returnObject.portfolioItemPicker = "";
                     }
 
-                    piSettings = SettingsUtils.setPortfolioItems(this.portfolioItems);
-
-                    returnObject.portfolioItemScope = this.portfolioItemScope;
+                    piSettings = SettingsUtils.createPortfolioItemsSettings(this.portfolioItems);
 
                     _.merge(returnObject, piSettings);
 

@@ -88,8 +88,6 @@ Ext.define("com.ca.technicalservices.Burnupdown", {
                 success: function (storiesData) {
                     stories = storiesData;
                     iterationCapacitiesManager = Ext.create('com.ca.technicalservices.Burnupdown.UserIterationCapacitiesManager');
-                    //var iterationOids = _.pluck(_.unique(stories, 'Iteration'), 'Iteration');
-                    //return iterationCapacitiesManager.loadCapacitiesForIterations(iterationOids);
                     return iterationCapacitiesManager.loadCapacitiesForDates(startDate, endDate);
                 }
             })

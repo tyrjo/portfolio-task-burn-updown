@@ -22,7 +22,6 @@
                 this.initConfig(config);
                 return this;
             },
-            loadCapacitiesForIterations: _loadCapacitiesForIterations,
             loadCapacitiesForDates: _loadCapacitiesForDates,
             getCapacitiesForDateString: _getCapacitiesForDateString
         };
@@ -137,58 +136,6 @@
                     }
                 }
             });
-            return deferred.getPromise();
-        }
-
-        function _loadCapacitiesForIterations(oids) {
-            var deferred = Ext.create('Deft.Deferred');
-            var iterationOids = _.filter(oids); // filter any blank ids
-            /*
-            if (iterationOids.length !== oids.length) {
-                console.warn("Iteration missing for at least one story snapshot.")
-            }*/
-
-            if (!iterationOids.length) {
-                // No iterations specified, nothing to do
-                deferred.reject("No iterations set");
-            } else {
-                var queries = iterationOids.map(function (oid) {
-                    return {
-                        property: 'Iteration.ObjectID',
-                        value: oid
-                    };
-                });
-                var filter = Rally.data.wsapi.Filter.or(queries);
-
-                Ext.create('Rally.data.wsapi.Store', {
-                    autoLoad: true,
-                    model: 'UserIterationCapacity',
-                    limit: Infinity,
-                    context: {
-                        projectScopeDown: true
-                    },
-                    fetch: userIterationCapacityFields,
-                    groupField: 'Iteration',    // Required, but ignored because of getGroupString
-                    getGroupString: function (instance) {
-                        return instance.data.Iteration._ref;
-                    },
-                    filters: filter,
-                    listeners: {
-                        scope: this,
-                        load: function (store, data, success) {
-                            if (!success) {
-                                deferred.reject("Unable to load user iteration capacities for iterations " + iterationOids);
-                            } else {
-                                if (data.length < 1) {
-                                    console.warn("No user iteration capacities found");
-                                }
-                                _collectIterations.call(this, store);
-                                deferred.resolve();
-                            }
-                        }
-                    }
-                });
-            }
             return deferred.getPromise();
         }
     }());

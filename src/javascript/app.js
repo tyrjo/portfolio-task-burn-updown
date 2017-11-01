@@ -73,14 +73,10 @@ Ext.define("com.ca.technicalservices.Burnupdown", {
                 scope: this,
                 success: function (featuresData) {
                     features = featuresData;
+
                     var dateManager = Ext.create('com.ca.technicalservices.Burnupdown.DateManager');
-                    return dateManager.getDates(features);
-                }
-            })
-            .then({
-                scope: this,
-                success: function (datesData) {
-                    dates = datesData;
+                    dates = dateManager.getDates(features);
+
                     var storiesManager = Ext.create('com.ca.technicalservices.Burnupdown.StoriesManager');
                     return storiesManager.getCurrentStories(features);
                 }

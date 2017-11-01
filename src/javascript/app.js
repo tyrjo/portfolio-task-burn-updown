@@ -66,7 +66,7 @@ Ext.define("com.ca.technicalservices.Burnupdown", {
     },
 
     launch: function () {
-        var features, stories, dates, iterationCapacitiesManager;
+        var features, stories, startDate, endDate, iterationCapacitiesManager;
         var featureManager = Ext.create('com.ca.technicalservices.Burnupdown.FeatureManager');
         featureManager.getFeatures()
             .then({
@@ -75,7 +75,9 @@ Ext.define("com.ca.technicalservices.Burnupdown", {
                     features = featuresData;
 
                     var dateManager = Ext.create('com.ca.technicalservices.Burnupdown.DateManager');
-                    dates = dateManager.getDates(features);
+                    var dateRange = dateManager.getDateRange(features);
+                    startDate = dateRange.getEarliestStartDate();
+                    endDate = dateRange.getLatestEndDate();
 
                     var storiesManager = Ext.create('com.ca.technicalservices.Burnupdown.StoriesManager');
                     return storiesManager.getCurrentStories(features);
@@ -85,27 +87,14 @@ Ext.define("com.ca.technicalservices.Burnupdown", {
                 scope: this,
                 success: function (storiesData) {
                     stories = storiesData;
-                    var iterationOids = _.pluck(_.unique(stories, 'Iteration'), 'Iteration');
                     iterationCapacitiesManager = Ext.create('com.ca.technicalservices.Burnupdown.UserIterationCapacitiesManager');
-                    return iterationCapacitiesManager.loadCapacitiesForIterations(iterationOids);
+                    return iterationCapacitiesManager.loadCapacitiesForDates(startDate, endDate);
                 }
             })
             .then({
                 scope: this,
                 success: function () {
                     var storyOids = _.pluck(stories, 'ObjectID');
-
-                    // Use the earliest actual start if there is one, otherwise use the earliest planned,
-                    // otherwise fall back on today
-                    var startDate;
-                    if (dates.getEarliestActualStartDate()) {
-                        startDate = dates.getEarliestActualStartDate();
-                    } else {
-                        startDate = dates.getEarliestPlannedStartDate() || new Date();
-                    }
-
-                    var endDate = dates.getLatestPlannedEndDate() || new Date();
-
                     this.add({
                         xtype: 'rallychart',
                         storeType: 'Rally.data.lookback.SnapshotStore',

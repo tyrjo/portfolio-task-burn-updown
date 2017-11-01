@@ -53,7 +53,7 @@
                         {
                             property: 'Release.Name',
                             value: release.Name
-                        },
+                        },/*
                         {
                             property: 'Release.ReleaseStartDate',
                             value: release.ReleaseStartDate
@@ -61,7 +61,7 @@
                         {
                             property: 'Release.ReleaseDate',
                             value: release.ReleaseDate
-                        }
+                        }*/
                     ],
                     listeners: {
                         load: function (store, data, success) {
@@ -110,6 +110,7 @@
                 Ext.create('Rally.data.lookback.SnapshotStore', {
                     autoLoad: true,
                     fetch: this.getFeatureFields(),
+                    limit: Infinity,
                     filters: filters,
                     listeners: {
                         load: function (store, data, success) {

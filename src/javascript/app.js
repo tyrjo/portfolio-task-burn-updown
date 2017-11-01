@@ -76,8 +76,8 @@ Ext.define("com.ca.technicalservices.Burnupdown", {
 
                     var dateManager = Ext.create('com.ca.technicalservices.Burnupdown.DateManager');
                     var dateRange = dateManager.getDateRange(features);
-                    startDate = dateRange.getEarliestStartDate();
-                    endDate = dateRange.getLatestEndDate();
+                    startDate = dateRange.getStartDate();
+                    endDate = dateRange.getEndDate();
 
                     var storiesManager = Ext.create('com.ca.technicalservices.Burnupdown.StoriesManager');
                     return storiesManager.getCurrentStories(features);

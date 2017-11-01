@@ -13,7 +13,7 @@
     var SUMMARY_METRIC_NAME_TOTAL_TODO_START_INDEX = METRIC_NAME_TOTAL_TODO + ' Start Index';
     var SUMMARY_METRIC_NAME_INITIAL_HOUR_ESTIMATE = 'Preliminary Estimate';
     var SUMMARY_METRIC_NAME_IDEAL_BURNDOWN = 'Ideal';
-    var SUMMARY_METRIC_NAME_TOTAL_TODO_MAX = METRIC_NAME_TOTAL_TODO + ' Max';
+    var SUMMARY_METRIC_NAME_TASK_EST_TOTAL_MAX = METRIC_NAME_TOTAL_TODO + ' Max';
 
     Ext.define('com.ca.technicalservices.Burnupdown.Calculator', {
         extend: 'Rally.data.lookback.calculator.TimeSeriesCalculator',
@@ -48,7 +48,7 @@
             this._getFeatureName = this._getFeatureName.bind(this);
             this._getFeaturesInitialHourEstimates = this._getFeaturesInitialHourEstimates.bind(this);
             this._getFeaturesInitialHourEstimatesMetric = this._getFeaturesInitialHourEstimatesMetric.bind(this);
-            this._getIdealBurndown = this._getIdealBurndown.bind(this);
+            this._getIdealBurndownForTick = this._getIdealBurndownForTick.bind(this);
 
             this.featureNameMap = _.reduce(this.features, function (accumulator, value) {
                 accumulator[value.ObjectID] = value.Name;
@@ -150,7 +150,7 @@
                 result = null;
             } else if (index == todoStartIndex) {
                 // First day To Do data is available, this is start of ideal burndown
-                result = snapshot[METRIC_NAME_TOTAL_TODO];
+                result = summaryMetrics[SUMMARY_METRIC_NAME_TASK_EST_TOTAL_MAX];
             } else {
                 var priorSnapshot = seriesData[index - 1];
                 var currentCapacity = this._getDailyCapacityForTick(snapshot);
@@ -186,7 +186,7 @@
             return summaryMetrics[SUMMARY_METRIC_NAME_INITIAL_HOUR_ESTIMATE];
         },
 
-        _getIdealBurndown: function (snapshot, index, summaryMetrics, seriesData) {
+        _getIdealBurndownForTick: function (snapshot, index, summaryMetrics, seriesData) {
 
             var result = 0;
 
@@ -197,9 +197,9 @@
                 result = null;
             } else if (index == todoStartIndex) {
                 // First day To Do data is available, this is start of ideal burndown
-                result = summaryMetrics[SUMMARY_METRIC_NAME_TOTAL_TODO_MAX];
+                result = summaryMetrics[SUMMARY_METRIC_NAME_TASK_EST_TOTAL_MAX];
             } else {
-                var max = summaryMetrics[SUMMARY_METRIC_NAME_TOTAL_TODO_MAX];
+                var max = summaryMetrics[SUMMARY_METRIC_NAME_TASK_EST_TOTAL_MAX];
                 var increments = seriesData.length-1-todoStartIndex;
                 var incrementAmount = max / increments;
                 return Math.floor(100 * (max - ((index - todoStartIndex) * incrementAmount))) / 100
@@ -359,8 +359,8 @@
                     f: this._getFeaturesInitialHourEstimates
                 },
                 {
-                    field: METRIC_NAME_TOTAL_TODO,
-                    as: SUMMARY_METRIC_NAME_TOTAL_TODO_MAX,
+                    field: METRIC_NAME_TASK_ESTIMATE_TOTAL,
+                    as: SUMMARY_METRIC_NAME_TASK_EST_TOTAL_MAX,
                     f: 'max'
                 }
             ]
@@ -393,7 +393,7 @@
                 },
                 {
                     as: SUMMARY_METRIC_NAME_IDEAL_BURNDOWN,
-                    f: this._getIdealBurndown,
+                    f: this._getIdealBurndownForTick,
                     display: 'line'
                 }
             ]

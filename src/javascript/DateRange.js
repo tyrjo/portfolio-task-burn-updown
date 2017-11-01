@@ -20,7 +20,7 @@
                 this.setLatestPlannedEndDate(_laterDate(end, this.latestPlannedEndDate));
             },
 
-            getEarliestStartDate: function () {
+            getStartDate: function () {
                 var startDate;
                 var actualStartDate = this.getEarliestActualStartDate();
                 if (actualStartDate) {
@@ -31,7 +31,7 @@
                 return startDate;
             },
 
-            getLatestEndDate: function () {
+            getEndDate: function () {
                 return this.getLatestPlannedEndDate() || new Date();
             }
         };

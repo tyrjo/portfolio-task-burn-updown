@@ -54,6 +54,8 @@
                             property: 'Release.Name',
                             value: release.get('Name')
                         },/*
+                        Can't use these dates because the selected release might be from a different project that
+                        uses different release dates for a release of the same name
                         {
                             property: 'Release.ReleaseStartDate',
                             value: release.ReleaseStartDate

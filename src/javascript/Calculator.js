@@ -8,9 +8,11 @@
     var METRIC_NAME_TOTAL_CAPACITY = 'Total Capacity';
     var METRIC_NAME_DAILY_CAPACITY = 'Daily Capacity';
     var METRIC_NAME_IDEAL_CAPACITY_BURNDOWN = 'Ideal Capacity Based Burndown';
+    var METRIC_NAME_FUTURE_IDEAL_CAPACITY_BURNDOWN = 'Future ' + METRIC_NAME_IDEAL_CAPACITY_BURNDOWN;
     var METRIC_NAME_TASK_ESTIMATE_TOTAL = 'Refined Estimate';
 
     var SUMMARY_METRIC_NAME_TOTAL_TODO_START_INDEX = METRIC_NAME_TOTAL_TODO + ' Start Index';
+    var SUMMARY_METRIC_NAME_TODAY_INDEX = 'Today Index';
     var SUMMARY_METRIC_NAME_INITIAL_HOUR_ESTIMATE = 'Preliminary Estimate';
     var SUMMARY_METRIC_NAME_IDEAL_BURNDOWN = 'Ideal';
     var SUMMARY_METRIC_NAME_TASK_EST_TOTAL_MAX = METRIC_NAME_TOTAL_TODO + ' Max';
@@ -31,6 +33,7 @@
             METRIC_NAME_TOTAL_CAPACITY,
             METRIC_NAME_DAILY_CAPACITY,
             METRIC_NAME_IDEAL_CAPACITY_BURNDOWN,
+            METRIC_NAME_FUTURE_IDEAL_CAPACITY_BURNDOWN,
             METRIC_NAME_TASK_ESTIMATE_TOTAL,
             SUMMARY_METRIC_NAME_IDEAL_BURNDOWN,
             SUMMARY_METRIC_NAME_INITIAL_HOUR_ESTIMATE
@@ -38,22 +41,9 @@
 
         features: undefined,
 
-        featureNameMap: undefined,
-
         constructor: function (config) {
             this.initConfig(config);
             this.callParent(arguments);
-            this._getDailyCapacityForTick = this._getDailyCapacityForTick.bind(this);
-            this._getCapacityBurndownForTick = this._getCapacityBurndownForTick.bind(this);
-            this._getFeatureName = this._getFeatureName.bind(this);
-            this._getFeaturesInitialHourEstimates = this._getFeaturesInitialHourEstimates.bind(this);
-            this._getFeaturesInitialHourEstimatesMetric = this._getFeaturesInitialHourEstimatesMetric.bind(this);
-            this._getIdealBurndownForTick = this._getIdealBurndownForTick.bind(this);
-
-            this.featureNameMap = _.reduce(this.features, function (accumulator, value) {
-                accumulator[value.ObjectID] = value.Name;
-                return accumulator;
-            }, {});
         },
 
         runCalculation: function (snapshots) {
@@ -104,36 +94,18 @@
         },
 
         _nullFutureData: function (data) {
-            var todayIndex = this._getDateIndexFromDate(data, new Date());
-            if (todayIndex > -1) {
+            if (this.todayIndex > -1) {
                 _.each(data.series, function (series) {
                     if (!_.contains(this.metricsAllowedOnFutureDates, series.name)) {
                         // This metric name has not been allowed for future dates. Null the values
                         // after today
                         series.data = _.map(series.data, function (value, index) {
-                            return (index > todayIndex) ? null : value;
+                            return (index > this.todayIndex) ? null : value;
                         }, this);
                     }
                 }, this);
             }
             return data;
-        },
-
-        _getDateIndexFromDate: function (highcharts_data, check_date) {
-            var date_iso = Rally.util.DateTime.toIsoString(new Date(check_date), true).replace(/T.*$/, '');
-            var date_index = -1;
-
-            Ext.Array.each(highcharts_data.categories, function (category, idx) {
-
-                if (category >= date_iso && date_index == -1) {
-                    date_index = idx;
-                }
-            });
-
-            if (date_index === 0) {
-                return date_index = -1;
-            }
-            return date_index;
         },
 
         _getDailyCapacityForTick: function (snapshot) {
@@ -143,7 +115,7 @@
 
         _getCapacityBurndownForTick: function (snapshot, index, summaryMetrics, seriesData) {
             var result = 0;
-
+            // TODO if today is not on the chart
             var todoStartIndex = summaryMetrics[SUMMARY_METRIC_NAME_TOTAL_TODO_START_INDEX];
             if (index < todoStartIndex) {
                 // Haven't started yet
@@ -152,13 +124,101 @@
                 // First day To Do data is available, this is start of ideal burndown
                 result = summaryMetrics[SUMMARY_METRIC_NAME_TASK_EST_TOTAL_MAX];
             } else {
+                var latestValidCapacitySnapshot;
+                var todayIndex = summaryMetrics[SUMMARY_METRIC_NAME_TODAY_INDEX];
+                if (todayIndex == -1) {
+                    var todayDate = new Date();
+                    var startDate = Ext.Date.parse(seriesData[0].tick, 'c');
+                    if (startDate > todayDate) {
+                        // Chart begins after today
+                        todayIndex = 0;
+                    } else {
+                        // Chart ends before today
+                        todayIndex = seriesData.length - 1;
+                    }
+                }
+
+                if (index > todayIndex) {
+                    latestValidCapacitySnapshot = seriesData[todayIndex];
+                } else {
+                    latestValidCapacitySnapshot = snapshot;
+                }
+                var currentCapacity = this._getDailyCapacityForTick(latestValidCapacitySnapshot);
+
                 var priorSnapshot = seriesData[index - 1];
-                var currentCapacity = this._getDailyCapacityForTick(snapshot);
 
                 // Today the team (ideally) would have reduced yesterday's remaining work by today's
                 // daily capacity resulting in today's "ideal capacity burndown" value, which will be
                 // the idea amount of work the team will reduce by tomorrow's capacity, etc.
                 result = Math.max(0, priorSnapshot[METRIC_NAME_IDEAL_CAPACITY_BURNDOWN] - currentCapacity);
+            }
+            return result;
+        },
+
+        _getCapacityBurndownForTick: function (snapshot, index, summaryMetrics, seriesData) {
+            var result = 0;
+            var todoStartIndex = summaryMetrics[SUMMARY_METRIC_NAME_TOTAL_TODO_START_INDEX];
+            if (index < todoStartIndex) {
+                // Haven't started yet
+                result = null;
+            } else if (index == todoStartIndex) {
+                // First day To Do data is available, this is start of ideal burndown
+                result = summaryMetrics[SUMMARY_METRIC_NAME_TASK_EST_TOTAL_MAX];
+            } else {
+                var latestValidCapacitySnapshot;
+                var todayIndex = summaryMetrics[SUMMARY_METRIC_NAME_TODAY_INDEX];
+                if (todayIndex == -1) {
+                    var todayDate = new Date();
+                    var startDate = Ext.Date.parse(seriesData[0].tick, 'c');
+                    if (startDate > todayDate) {
+                        // Chart begins after today
+                        todayIndex = 0;
+                    } else {
+                        // Chart ends before today
+                        todayIndex = seriesData.length - 1;
+                    }
+                }
+
+                if (index > todayIndex) {
+                    latestValidCapacitySnapshot = seriesData[todayIndex];
+                } else {
+                    latestValidCapacitySnapshot = snapshot;
+                }
+                var currentCapacity = this._getDailyCapacityForTick(latestValidCapacitySnapshot);
+
+                var priorSnapshot = seriesData[index - 1];
+
+                // Today the team (ideally) would have reduced yesterday's remaining work by today's
+                // daily capacity resulting in today's "ideal capacity burndown" value, which will be
+                // the idea amount of work the team will reduce by tomorrow's capacity, etc.
+                result = Math.max(0, priorSnapshot[METRIC_NAME_IDEAL_CAPACITY_BURNDOWN] - currentCapacity);
+            }
+            return result;
+        },
+
+        _getFutureCapacityBurndownForTick: function (snapshot, index, summaryMetrics, seriesData) {
+            var result = 0;
+
+            if (this.todayIndex < 0) {
+                result = null;
+            } else if (index < this.todayIndex) {
+                // Haven't started yet
+                result = null;
+            } else if (index == this.todayIndex) {
+                // First day To Do data is available, this is start of forcast burndown
+                result = snapshot[METRIC_NAME_TOTAL_TODO];
+            } else {
+                var latestValidCapacitySnapshot;
+                latestValidCapacitySnapshot = seriesData[this.todayIndex];
+
+                var currentCapacity = this._getDailyCapacityForTick(latestValidCapacitySnapshot);
+
+                var priorSnapshot = seriesData[index - 1];
+
+                // Today the team (ideally) would have reduced yesterday's remaining work by today's
+                // daily capacity resulting in today's "ideal capacity burndown" value, which will be
+                // the idea amount of work the team will reduce by tomorrow's capacity, etc.
+                result = Math.max(0, priorSnapshot[METRIC_NAME_FUTURE_IDEAL_CAPACITY_BURNDOWN] - currentCapacity);
             }
             return result;
         },
@@ -170,10 +230,6 @@
             } else {
                 return 0;
             }
-        },
-
-        _getFeatureName: function (snapshot) {
-            return this.featureNameMap[snapshot.Feature]
         },
 
         _getFeaturesInitialHourEstimates: function () {
@@ -200,7 +256,7 @@
                 result = summaryMetrics[SUMMARY_METRIC_NAME_TASK_EST_TOTAL_MAX];
             } else {
                 var max = summaryMetrics[SUMMARY_METRIC_NAME_TASK_EST_TOTAL_MAX];
-                var increments = seriesData.length-1-todoStartIndex;
+                var increments = seriesData.length - 1 - todoStartIndex;
                 var incrementAmount = max / increments;
                 return Math.floor(100 * (max - ((index - todoStartIndex) * incrementAmount))) / 100
             }
@@ -356,12 +412,23 @@
                 },
                 {
                     as: SUMMARY_METRIC_NAME_INITIAL_HOUR_ESTIMATE,
-                    f: this._getFeaturesInitialHourEstimates
+                    f: this._getFeaturesInitialHourEstimates.bind(this)
                 },
                 {
                     field: METRIC_NAME_TASK_ESTIMATE_TOTAL,
                     as: SUMMARY_METRIC_NAME_TASK_EST_TOTAL_MAX,
                     f: 'max'
+                },
+                {
+                    as: SUMMARY_METRIC_NAME_TODAY_INDEX,
+                    f: (function (seriesData, summaryMetrics) {
+                        // Save todayIndex onto the calculator so it is available in this.runCalculation, which
+                        // doesn't have access to the summary metrics
+                        this.todayIndex = _.findIndex(seriesData, function (data) {
+                            return Ext.Date.parse(data.tick, 'c') > new Date();
+                        });
+                        return this.todayIndex;
+                    }).bind(this)
                 }
             ]
         },
@@ -382,23 +449,27 @@
             return [
                 {
                     as: METRIC_NAME_IDEAL_CAPACITY_BURNDOWN,
-                    f: this._getCapacityBurndownForTick,
+                    f: this._getCapacityBurndownForTick.bind(this),
+                    display: 'line'
+                },
+                {
+                    as: METRIC_NAME_FUTURE_IDEAL_CAPACITY_BURNDOWN,
+                    f: this._getFutureCapacityBurndownForTick.bind(this),
                     display: 'line'
                 },
                 {
                     field: SUMMARY_METRIC_NAME_INITIAL_HOUR_ESTIMATE,
                     as: SUMMARY_METRIC_NAME_INITIAL_HOUR_ESTIMATE,
-                    f: this._getFeaturesInitialHourEstimatesMetric,
+                    f: this._getFeaturesInitialHourEstimatesMetric.bind(this),
                     display: 'line'
                 },
                 {
                     as: SUMMARY_METRIC_NAME_IDEAL_BURNDOWN,
-                    f: this._getIdealBurndownForTick,
+                    f: this._getIdealBurndownForTick.bind(this),
                     display: 'line'
                 }
             ]
         }
-
 
     });
 }());

@@ -11,6 +11,7 @@
     var METRIC_NAME_TASK_ESTIMATE_TOTAL = 'Refined Estimate';
 
     var SUMMARY_METRIC_NAME_TOTAL_TODO_START_INDEX = METRIC_NAME_TOTAL_TODO + ' Start Index';
+    var SUMMARY_METRIC_NAME_TODAY_INDEX = 'Today Index';
     var SUMMARY_METRIC_NAME_INITIAL_HOUR_ESTIMATE = 'Preliminary Estimate';
     var SUMMARY_METRIC_NAME_IDEAL_BURNDOWN = 'Ideal';
     var SUMMARY_METRIC_NAME_TASK_EST_TOTAL_MAX = METRIC_NAME_TOTAL_TODO + ' Max';
@@ -104,36 +105,18 @@
         },
 
         _nullFutureData: function (data) {
-            var todayIndex = this._getDateIndexFromDate(data, new Date());
-            if (todayIndex > -1) {
+            if (this.todayIndex > -1) {
                 _.each(data.series, function (series) {
                     if (!_.contains(this.metricsAllowedOnFutureDates, series.name)) {
                         // This metric name has not been allowed for future dates. Null the values
                         // after today
                         series.data = _.map(series.data, function (value, index) {
-                            return (index > todayIndex) ? null : value;
+                            return (index > this.todayIndex) ? null : value;
                         }, this);
                     }
                 }, this);
             }
             return data;
-        },
-
-        _getDateIndexFromDate: function (highcharts_data, check_date) {
-            var date_iso = Rally.util.DateTime.toIsoString(new Date(check_date), true).replace(/T.*$/, '');
-            var date_index = -1;
-
-            Ext.Array.each(highcharts_data.categories, function (category, idx) {
-
-                if (category >= date_iso && date_index == -1) {
-                    date_index = idx;
-                }
-            });
-
-            if (date_index === 0) {
-                return date_index = -1;
-            }
-            return date_index;
         },
 
         _getDailyCapacityForTick: function (snapshot) {
@@ -143,7 +126,7 @@
 
         _getCapacityBurndownForTick: function (snapshot, index, summaryMetrics, seriesData) {
             var result = 0;
-
+            // TODO if today is not on the chart
             var todoStartIndex = summaryMetrics[SUMMARY_METRIC_NAME_TOTAL_TODO_START_INDEX];
             if (index < todoStartIndex) {
                 // Haven't started yet
@@ -152,8 +135,28 @@
                 // First day To Do data is available, this is start of ideal burndown
                 result = summaryMetrics[SUMMARY_METRIC_NAME_TASK_EST_TOTAL_MAX];
             } else {
+                var latestValidCapacitySnapshot;
+                var todayIndex = summaryMetrics[SUMMARY_METRIC_NAME_TODAY_INDEX];
+                if (todayIndex == -1) {
+                    var todayDate = new Date();
+                    var startDate = Ext.Date.parse(seriesData[0].tick, 'c');
+                    if (startDate > todayDate) {
+                        // Chart begins after today
+                        todayIndex = 0;
+                    } else {
+                        // Chart ends before today
+                        todayIndex = seriesData.length - 1;
+                    }
+                }
+
+                if (index > todayIndex) {
+                    latestValidCapacitySnapshot = seriesData[todayIndex];
+                } else {
+                    latestValidCapacitySnapshot = snapshot;
+                }
+                var currentCapacity = this._getDailyCapacityForTick(latestValidCapacitySnapshot);
+
                 var priorSnapshot = seriesData[index - 1];
-                var currentCapacity = this._getDailyCapacityForTick(snapshot);
 
                 // Today the team (ideally) would have reduced yesterday's remaining work by today's
                 // daily capacity resulting in today's "ideal capacity burndown" value, which will be
@@ -200,7 +203,7 @@
                 result = summaryMetrics[SUMMARY_METRIC_NAME_TASK_EST_TOTAL_MAX];
             } else {
                 var max = summaryMetrics[SUMMARY_METRIC_NAME_TASK_EST_TOTAL_MAX];
-                var increments = seriesData.length-1-todoStartIndex;
+                var increments = seriesData.length - 1 - todoStartIndex;
                 var incrementAmount = max / increments;
                 return Math.floor(100 * (max - ((index - todoStartIndex) * incrementAmount))) / 100
             }
@@ -362,6 +365,17 @@
                     field: METRIC_NAME_TASK_ESTIMATE_TOTAL,
                     as: SUMMARY_METRIC_NAME_TASK_EST_TOTAL_MAX,
                     f: 'max'
+                },
+                {
+                    as: SUMMARY_METRIC_NAME_TODAY_INDEX,
+                    f: (function (seriesData, summaryMetrics) {
+                        // Save todayIndex onto the calculator so it is available in this.runCalculation, which
+                        // doesn't have access to the summary metrics
+                        this.todayIndex = _.findIndex(seriesData, function (data) {
+                            return Ext.Date.parse(data.tick, 'c') > new Date();
+                        });
+                        return this.todayIndex;
+                    }).bind(this)
                 }
             ]
         },

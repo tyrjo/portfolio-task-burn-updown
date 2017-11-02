@@ -21,10 +21,10 @@
             getFeatures: _getFeatures
         };
 
-        function _getFeatures() {
+        function _getFeatures(release) {
             var promise;
-            if (SettingsUtils.isReleaseScope()) {
-                promise = _getFeaturesFromRelease.call(this, SettingsUtils.getRelease());
+            if (release) {
+                promise = _getFeaturesFromRelease.call(this, release);
             } else {
                 promise = _getFeaturesFromPis.call(this, SettingsUtils.getPortfolioItems());
             }
@@ -52,7 +52,7 @@
                     filters: [
                         {
                             property: 'Release.Name',
-                            value: release.Name
+                            value: release.get('Name')
                         },/*
                         {
                             property: 'Release.ReleaseStartDate',
@@ -66,7 +66,7 @@
                     listeners: {
                         load: function (store, data, success) {
                             if (!success || data.length < 1) {
-                                deferred.reject("Unable to load features from release " + release.Name);
+                                deferred.reject("Unable to load features from release " + release.get('Name'));
                             } else {
                                 deferred.resolve(data);
                             }

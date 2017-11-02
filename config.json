@@ -8,6 +8,7 @@
     "src/javascript/settings/PortfolioItemPicker.js",
     "src/javascript/StoriesManager.js",
     "src/javascript/FeatureManager.js",
+    "src/javascript/ReleaseManager.js",
     "src/javascript/UserIterationCapacitiesManager.js",
     "src/javascript/DateRange.js",
     "src/javascript/DateManager.js",

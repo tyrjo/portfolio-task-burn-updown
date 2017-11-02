@@ -66,16 +66,32 @@ Ext.define("com.ca.technicalservices.Burnupdown", {
     },
 
     launch: function () {
-        var features, stories, startDate, endDate, iterationCapacitiesManager;
-        var featureManager = Ext.create('com.ca.technicalservices.Burnupdown.FeatureManager');
-        featureManager.getFeatures()
+        var promise;
+        var release, features, stories, startDate, endDate, iterationCapacitiesManager;
+        var releaseManager = Ext.create('com.ca.technicalservices.Burnupdown.ReleaseManager');
+
+        if ( SettingsUtils.isReleaseScope() ) {
+            promise = releaseManager.getReleaseByName(SettingsUtils.getRelease().Name)
+        } else {
+            promise = Deft.promise.Promise.when(undefined);
+        }
+
+        promise.then({
+                scope: this,
+                success: function (releaseData) {
+                    release = releaseData;
+                    var featureManager = Ext.create('com.ca.technicalservices.Burnupdown.FeatureManager');
+                    return featureManager.getFeatures(release);
+                }
+            })
             .then({
                 scope: this,
                 success: function (featuresData) {
                     features = featuresData;
 
                     var dateManager = Ext.create('com.ca.technicalservices.Burnupdown.DateManager');
-                    var dateRange = dateManager.getDateRange(features);
+                    var dateRange = dateManager.getDateRange(release, features);
+
                     startDate = dateRange.getStartDate();
                     endDate = dateRange.getEndDate();
 

@@ -22,21 +22,21 @@
             getDateRange: _getDateRange
         };
 
-        function _getDateRange(features) {
+        function _getDateRange(release, features) {
             var initialValue = Ext.create('com.ca.technicalservices.Burnupdown.DateRange');
             var result = _getDatesFromFeatures(features, initialValue);
 
-            if (SettingsUtils.isReleaseScope()) {
+            if (release) {
                 // Merge release dates with the feature dates
-                result = _getDatesFromRelease(SettingsUtils.getRelease(), result);
+                result = _getDatesFromRelease(release, result);
             }
 
             return result;
         }
 
         function _getDatesFromRelease(release, initialValue) {
-            var plannedStartDate = release.ReleaseStartDate ? Ext.Date.parse(release.ReleaseStartDate, 'c') : undefined;
-            var plannedEndDate = release.ReleaseDate ? Ext.Date.parse(release.ReleaseDate, 'c') : undefined;
+            var plannedStartDate = release.get('ReleaseStartDate') ? Ext.Date.parse(release.get('ReleaseStartDate'), 'c') : undefined;
+            var plannedEndDate = release.get('ReleaseDate') ? Ext.Date.parse(release.get('ReleaseDate'), 'c') : undefined;
             initialValue.addDates(plannedStartDate, plannedStartDate, plannedEndDate);
             return initialValue;
         }

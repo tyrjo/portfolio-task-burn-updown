@@ -1,8 +1,48 @@
 # Portfolio Task Burn Up/Down
 
 ## Summary/Description
+This app is a combination of per-feature task hour "To Do" burndown with task "Actual" burnup several custom
+metrics.
 
 ![screenshot](./images/screenshot.png "This is an example")
+
+### Features:
+#### Chart controls
+* Mouse over any field to see its values
+* Drag a rectangle to zoom that area of the chart
+* Click items in the Legend to turn that field on or off
+
+#### Chart fields
+* **Select Release** (_in app settings_) - The app will search up the project hierarchy for any
+`PortfolioItem/Feature` whose `Release.Name` matches the selected Release.
+* **Select Portfolio Items** (_in app settings_) - Select any number of individual Portfolio Items
+(Features, Initiatives, etc).
+* **Start / End Dates** - Based on **one of**
+  * (release selected) the **first** release found in the project hierarchy that matches the
+  selected `Release.Name`. **NOTE:** This might be the per-project release, NOT the parent release
+  containing features.
+  * (PIs selected) the earliest actual and latest end date of the selected PIs, defaulting to today
+  if no dates are set on the PIs
+* **Total To Do** - Burndown chart of the sum of all child stories `TaskRemainingTotal` values from
+the given features. Each column is stacked by feature, and has rounded corners.  A line connects
+the top of all bars to make the trend easier to see.
+* **Total Actual** - Burndown chart of the sum of all child stories `TaskActual` values from
+the given features. Each column is stacked by feature, and has square corners.  A line connects
+the top of all bars to make the trend easier to see.
+* **Preliminary Estimate** - Summary line showing the total `Feature.c_InitialHourEstimate` for all
+features.
+* **Refined Estimate** - Line showing the updated total of all `TaskEstimateTotal`.
+* **Ideal** - Linear burndown assuming that the current max `TaskEstimateTotal` was known at the start
+and indicates the contant rate hours need to be completed to finish on the planned end date.
+* **Ideal Capacity Based Burndown** - Same as the **Ideal** except is burns down by the total `UserIterationCapacity`
+values found for the current project that span the current day.
+* **Future Ideal Capacity Based Burndown** - Starting on the most current day of the chart, at that
+day's `TaskRemainingTotal`, and burns down by the total `UserIterationCapacity` values from that day.  Shows
+roughly when team is forecast to finish based on their scheduled Iteration Capacity.
+
+### Limitations
+
+* Per-feature colors will repeat after 12 features
 
 ## Development Notes
 
@@ -36,12 +76,6 @@ to Rally.  This resulting auth.json file should NOT be checked in.
   target html file
   * src/style: All of the stylesheets saved here will be compiled into the 
   target html file
-  * test/fast: Fast jasmine tests go here.  There should also be a helper 
-  file that is loaded first for creating mocks and doing other shortcuts
-  (fastHelper.js) **Tests should be in a file named <something>-spec.js**
-  * test/slow: Slow jasmine tests go here.  There should also be a helper
-  file that is loaded first for creating mocks and doing other shortcuts 
-  (slowHelper.js) **Tests should be in a file named <something>-spec.js**
   * templates: This is where templates that are used to create the production
   and debug html files live.  The advantage of using these templates is that
   you can configure the behavior of the html around the JS.
@@ -56,9 +90,23 @@ to Rally.  This resulting auth.json file should NOT be checked in.
         "password":"secret",
         "server": "https://rally1.rallydev.com"
     }
+
+### Basic File Purpose
+* src/javascript
+   * app.js - load data and create a chart
+   * Calculator.js - convert Lookback data for stories into a Highchart
+   * DateManager.js - Determine Start/End dates from Features/Release
+   * DateRange.js - Merge start/actual/end dates from features and releases
+   * FeatureManager.js - Load appropriate features
+   * StoriesManager.js - Load appropriate user stories
+   * UserIterationsCapacitiesManager.js - Load UserIterationCapacities for date range
+   * settings/
+     * PortfolioItemPicker.js - Application settings page
+     * Utils.js - Helpers to serialize/deserialize complex settings
   
 ### Usage of the grunt file
-####Tasks
+
+#### Tasks
     
 ##### grunt debug
 
@@ -109,6 +157,14 @@ When the first install is complete, the script will add the ObjectIDs of the pag
 On subsequent installs, the script will write to this same page/app. Remove the
 pageOid and panelOid lines to install in a new place.  CAUTION:  Currently, error checking is not enabled, so it will fail silently.
 
+##### grunt deploy-pretty
+
+Same as `grunt deploy` but deploys the unminified version.
+
+##### grunt deploy-debug
+Same as ` grunt deploy` but deploys the unminified app and a debug version of the SDK.
+
+
 ##### grunt watch
 
 Run this to watch files (js and css).  When a file is saved, the task will automatically build, run fast tests, and deploy as shown in the deploy section above.
@@ -121,4 +177,10 @@ This task will create an auth.json file in the proper format for you.  **Be care
 
 Get a full listing of available targets.
 
+### NPM Scripts
 
+Some helper scripts to provide variations on the grunt watch tasks
+
+##### npm run deploy-debug:watch
+
+Watches source for changes and re-deploys the debug version of the app.

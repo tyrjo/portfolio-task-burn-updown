@@ -49,7 +49,7 @@
                     listeners: {
                         load: function (store, data, success) {
                             if (!success || data.length < 1) {
-                                deferred.reject("Unable to load release " + name);
+                                deferred.reject("Unable to load release \"" + name + "\" for the current project.");
                             } else {
                                 deferred.resolve(data[0]);
                             }

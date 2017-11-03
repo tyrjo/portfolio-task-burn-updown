@@ -11,7 +11,7 @@
     var METRIC_NAME_FUTURE_IDEAL_CAPACITY_BURNDOWN = 'Future ' + METRIC_NAME_IDEAL_CAPACITY_BURNDOWN;
     var METRIC_NAME_TASK_ESTIMATE_TOTAL = 'Refined Estimate';
 
-    var SUMMARY_METRIC_NAME_TOTAL_TODO_START_INDEX = METRIC_NAME_TOTAL_TODO + ' Start Index';
+    var SUMMARY_METRIC_NAME_ACTUAL_START_INDEX = 'Actual Start Index';
     var SUMMARY_METRIC_NAME_TODAY_INDEX = 'Today Index';
     var SUMMARY_METRIC_NAME_INITIAL_HOUR_ESTIMATE = 'Preliminary Estimate';
     var SUMMARY_METRIC_NAME_IDEAL_BURNDOWN = 'Ideal';
@@ -73,12 +73,12 @@
             // Minimum step of 1, otherwise step an even amount if there are a small number of features
             var colorIndexStep = Math.min(1, Math.floor(numColors / Math.min(numColors, this.features.length)));
             _.each(this.features, function (feature) {
-                metricNames[METRIC_NAME_PREFIX_TODO + feature.Name] = {
+                metricNames[METRIC_NAME_PREFIX_TODO + feature.get('FormattedID')] = {
                     stack: METRIC_NAME_PREFIX_TODO,
                     color: Ext.draw.Color.toHex(colors[colorIndex]),
                     borderRadius: 10
                 };
-                metricNames[METRIC_NAME_PREFIX_ACTUAL + feature.Name] = {
+                metricNames[METRIC_NAME_PREFIX_ACTUAL + feature.get('FormattedID')] = {
                     stack: METRIC_NAME_PREFIX_ACTUAL,
                     color: Ext.draw.Color.toHex(colors[colorIndex])
                 };
@@ -115,49 +115,7 @@
 
         _getCapacityBurndownForTick: function (snapshot, index, summaryMetrics, seriesData) {
             var result = 0;
-            // TODO if today is not on the chart
-            var todoStartIndex = summaryMetrics[SUMMARY_METRIC_NAME_TOTAL_TODO_START_INDEX];
-            if (index < todoStartIndex) {
-                // Haven't started yet
-                result = null;
-            } else if (index == todoStartIndex) {
-                // First day To Do data is available, this is start of ideal burndown
-                result = summaryMetrics[SUMMARY_METRIC_NAME_TASK_EST_TOTAL_MAX];
-            } else {
-                var latestValidCapacitySnapshot;
-                var todayIndex = summaryMetrics[SUMMARY_METRIC_NAME_TODAY_INDEX];
-                if (todayIndex == -1) {
-                    var todayDate = new Date();
-                    var startDate = Ext.Date.parse(seriesData[0].tick, 'c');
-                    if (startDate > todayDate) {
-                        // Chart begins after today
-                        todayIndex = 0;
-                    } else {
-                        // Chart ends before today
-                        todayIndex = seriesData.length - 1;
-                    }
-                }
-
-                if (index > todayIndex) {
-                    latestValidCapacitySnapshot = seriesData[todayIndex];
-                } else {
-                    latestValidCapacitySnapshot = snapshot;
-                }
-                var currentCapacity = this._getDailyCapacityForTick(latestValidCapacitySnapshot);
-
-                var priorSnapshot = seriesData[index - 1];
-
-                // Today the team (ideally) would have reduced yesterday's remaining work by today's
-                // daily capacity resulting in today's "ideal capacity burndown" value, which will be
-                // the idea amount of work the team will reduce by tomorrow's capacity, etc.
-                result = Math.max(0, priorSnapshot[METRIC_NAME_IDEAL_CAPACITY_BURNDOWN] - currentCapacity);
-            }
-            return result;
-        },
-
-        _getCapacityBurndownForTick: function (snapshot, index, summaryMetrics, seriesData) {
-            var result = 0;
-            var todoStartIndex = summaryMetrics[SUMMARY_METRIC_NAME_TOTAL_TODO_START_INDEX];
+            var todoStartIndex = summaryMetrics[SUMMARY_METRIC_NAME_ACTUAL_START_INDEX];
             if (index < todoStartIndex) {
                 // Haven't started yet
                 result = null;
@@ -225,7 +183,7 @@
 
         _getDataForFeature: function (feature, snapshot, attribute) {
             // TODO (tj) Add to readme that 'Feature' name may vary if Portfolio item type
-            if (snapshot.Feature === feature.ObjectID) {
+            if (snapshot.Feature === feature.get('ObjectID')) {
                 return snapshot[attribute];
             } else {
                 return 0;
@@ -234,7 +192,7 @@
 
         _getFeaturesInitialHourEstimates: function () {
             return _.reduce(this.features, function (sum, feature) {
-                return sum + (feature.c_InitialHourEstimate || 0);
+                return sum + (feature.get('c_InitialHourEstimate') || 0);
             }, 0);
         },
 
@@ -246,7 +204,7 @@
 
             var result = 0;
 
-            var todoStartIndex = summaryMetrics[SUMMARY_METRIC_NAME_TOTAL_TODO_START_INDEX];
+            var todoStartIndex = summaryMetrics[SUMMARY_METRIC_NAME_ACTUAL_START_INDEX];
 
             if (index < todoStartIndex) {
                 // Haven't started yet
@@ -280,13 +238,13 @@
             // to each feature. This will be summed by metrics in getMetrics.
             _.forEach(this.features, function (feature) {
                 fields.push({
-                    as: METRIC_NAME_PREFIX_TODO + feature.Name,
+                    as: METRIC_NAME_PREFIX_TODO + feature.get('FormattedID'),
                     f: function (snapshot) {
                         return self._getDataForFeature(feature, snapshot, 'TaskRemainingTotal');
                     }
                 });
                 fields.push({
-                    as: METRIC_NAME_PREFIX_ACTUAL + feature.Name,
+                    as: METRIC_NAME_PREFIX_ACTUAL + feature.get('FormattedID'),
                     f: function (snapshot) {
                         return self._getDataForFeature(feature, snapshot, 'TaskActualTotal');
                     }
@@ -353,14 +311,14 @@
             */
             _.each(this.features, function (feature) {
                 metrics.push({
-                    field: METRIC_NAME_PREFIX_TODO + feature.Name,
-                    as: METRIC_NAME_PREFIX_TODO + feature.Name,
+                    field: METRIC_NAME_PREFIX_TODO + feature.get('FormattedID'),
+                    as: METRIC_NAME_PREFIX_TODO + feature.get('FormattedID'),
                     f: 'sum',
                     display: 'column'
                 });
                 metrics.push({
-                    field: METRIC_NAME_PREFIX_ACTUAL + feature.Name,
-                    as: METRIC_NAME_PREFIX_ACTUAL + feature.Name,
+                    field: METRIC_NAME_PREFIX_ACTUAL + feature.get('FormattedID'),
+                    as: METRIC_NAME_PREFIX_ACTUAL + feature.get('FormattedID'),
                     f: 'sum',
                     display: 'column'
                 });
@@ -405,12 +363,6 @@
         getSummaryMetricsConfig: function () {
             return [
                 {
-                    as: SUMMARY_METRIC_NAME_TOTAL_TODO_START_INDEX,
-                    f: function (seriesData, summaryMetrics) {
-                        return _.findIndex(seriesData, METRIC_NAME_TOTAL_TODO);
-                    }
-                },
-                {
                     as: SUMMARY_METRIC_NAME_INITIAL_HOUR_ESTIMATE,
                     f: this._getFeaturesInitialHourEstimates.bind(this)
                 },
@@ -418,6 +370,15 @@
                     field: METRIC_NAME_TASK_ESTIMATE_TOTAL,
                     as: SUMMARY_METRIC_NAME_TASK_EST_TOTAL_MAX,
                     f: 'max'
+                },
+                {
+                    as: SUMMARY_METRIC_NAME_ACTUAL_START_INDEX,
+                    f: (function (seriesData, summaryMetrics) {
+                        var startDate = Ext.Date.parse(this.getStartDate(), 'c');
+                        return _.findIndex(seriesData, function (data) {
+                            return Ext.Date.parse(data.tick, 'c') >= startDate;
+                        });
+                    }).bind(this)
                 },
                 {
                     as: SUMMARY_METRIC_NAME_TODAY_INDEX,

@@ -11,7 +11,8 @@
                     'c_InitialHourEstimate',
                     'PlannedStartDate',
                     'ActualStartDate',
-                    'PlannedEndDate'
+                    'PlannedEndDate',
+                    'FormattedID'
                 ]
             },
             constructor: function (config) {
@@ -28,13 +29,7 @@
             } else {
                 promise = _getFeaturesFromPis.call(this, SettingsUtils.getPortfolioItems());
             }
-            return promise.then({
-                success: function (data) {
-                    // Get an object of just the fetched values
-                    return _.pluck(data, 'raw');
-                }
-            })
-
+            return promise;
         }
 
         function _getFeaturesFromRelease(release) {
@@ -68,7 +63,7 @@
                     listeners: {
                         load: function (store, data, success) {
                             if (!success || data.length < 1) {
-                                deferred.reject("Unable to load features from release " + release.get('Name'));
+                                deferred.reject("No features found in release \"" + release.get('Name') + "\" in the current or parent projects.");
                             } else {
                                 deferred.resolve(data);
                             }

@@ -1,31 +1,17 @@
 // TODO (tj) use Ext or _ for array functions
 // TODO (tj) use Ext.Date.between for date checks
 
-//TODO (tj) Next steps
-/**
- * Manual tests
- * Select Theme with child Initiatives, Features and Stories
- * Select Initiative with child Features and Stories
- * Select Feature with child Stories
- * Select Portfolio Item with no direct children
- * Select Portfolio Item with no decendent Stories
- * Select Portfolio Items with mix of decendent Stories and no decendent
- *
- * What if no items returned for any expected item? Features, Iterations, Stories, etc...
- */
-
 // TODO (tj) Possible optimizations
 /**
  * If only 1 features, make todo and actual different colors
  * dash/dot the todo and actual lines
  * distinct colors for all lines (different from columns)
- * Start chart on actual start date
  */
 
 Ext.define("com.ca.technicalservices.Burnupdown", {
-    extend: 'Rally.app.TimeboxScopedApp',
+    extend: 'Rally.app.App',
 
-    scopeType: 'release',
+    layout: 'fit',
 
     requires: [
         'SettingsUtils',
@@ -68,22 +54,25 @@ Ext.define("com.ca.technicalservices.Burnupdown", {
     launch: function () {
         var promise;
         var release, features, stories, startDate, endDate, iterationCapacitiesManager;
+
+        this.setLoading("Loading data ...");
+
         var releaseManager = Ext.create('com.ca.technicalservices.Burnupdown.ReleaseManager');
 
-        if ( SettingsUtils.isReleaseScope() ) {
+        if (SettingsUtils.isReleaseScope()) {
             promise = releaseManager.getReleaseByName(SettingsUtils.getRelease().Name)
         } else {
             promise = Deft.promise.Promise.when(undefined);
         }
 
         promise.then({
-                scope: this,
-                success: function (releaseData) {
-                    release = releaseData;
-                    var featureManager = Ext.create('com.ca.technicalservices.Burnupdown.FeatureManager');
-                    return featureManager.getFeatures(release);
-                }
-            })
+            scope: this,
+            success: function (releaseData) {
+                release = releaseData;
+                var featureManager = Ext.create('com.ca.technicalservices.Burnupdown.FeatureManager');
+                return featureManager.getFeatures(release);
+            }
+        })
             .then({
                 scope: this,
                 success: function (featuresData) {
@@ -111,7 +100,7 @@ Ext.define("com.ca.technicalservices.Burnupdown", {
                 scope: this,
                 success: function () {
                     var storyOids = _.pluck(stories, 'ObjectID');
-                    this.add({
+                    var chart = this.add({
                         xtype: 'rallychart',
                         storeType: 'Rally.data.lookback.SnapshotStore',
                         storeConfig: this._getStoreConfig(storyOids),
@@ -123,12 +112,22 @@ Ext.define("com.ca.technicalservices.Burnupdown", {
                             iterationCapacitiesManager: iterationCapacitiesManager,
                             features: features
                         },
-                        chartConfig: this._getChartConfig()
+                        chartConfig: this._getChartConfig(this._getChartTitle(release, features)),
+                        loadMask: false,
+                        listeners: {
+                            scope: this,
+                            readyToRender: function () {
+                                this.setLoading(false);
+                            }
+                        }
                     });
+                    chart.setLoadMask(false);   // Hide chart default load mask
                 }
             })
             .otherwise({
+                scope: this,
                 fn: function (msg) {
+                    this.setLoading(false);
                     Ext.Msg.alert('Error', msg);
                 }
             })
@@ -158,13 +157,13 @@ Ext.define("com.ca.technicalservices.Burnupdown", {
     /**
      * Generate a valid Highcharts configuration object to specify the chart
      */
-    _getChartConfig: function () {
+    _getChartConfig: function (title) {
         return {
             chart: {
                 zoomType: 'xy'
             },
             title: {
-                text: 'Portfolio Task Hours'
+                text: title
             },
             xAxis: {
                 tickmarkPlacement: 'on',
@@ -191,5 +190,17 @@ Ext.define("com.ca.technicalservices.Burnupdown", {
                 }
             }
         };
+    },
+
+    _getChartTitle: function (release, features) {
+        var result;
+        if ( SettingsUtils.isReleaseScope() ) {
+            result = 'Release: ' + release.get('Name');
+        } else {
+            result = 'Features: ' + _.map(features, function(feature) {
+                return feature.get('FormattedID');
+            }).join(', ');
+        }
+        return result;
     }
 });

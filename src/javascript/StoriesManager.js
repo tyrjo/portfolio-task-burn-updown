@@ -16,7 +16,9 @@
 
         function _getCurrentStories(features) {
             var deferred = Ext.create('Deft.Deferred');
-            var featureOids = _.pluck(features, 'ObjectID');
+            var featureOids = _.map(features, function(feature){
+                return feature.get('ObjectID');
+            });
             var dataContext = Rally.getApp().getContext().getDataContext();
             var filters = [
                 {
@@ -50,7 +52,7 @@
                 listeners: {
                     load: function (store, data, success) {
                         if (!success || data.length < 1) {
-                            deferred.reject("Unable to load user stories");
+                            deferred.reject("Unable to load user stories for the selected features");
                         } else {
                             deferred.resolve(_.pluck(data, 'raw'));
                         }

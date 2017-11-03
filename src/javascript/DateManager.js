@@ -37,15 +37,15 @@
         function _getDatesFromRelease(release, initialValue) {
             var plannedStartDate = release.get('ReleaseStartDate') ? Ext.Date.parse(release.get('ReleaseStartDate'), 'c') : undefined;
             var plannedEndDate = release.get('ReleaseDate') ? Ext.Date.parse(release.get('ReleaseDate'), 'c') : undefined;
-            initialValue.addDates(plannedStartDate, plannedStartDate, plannedEndDate);
+            initialValue.addDates(plannedStartDate, undefined, plannedEndDate);
             return initialValue;
         }
 
         function _getDatesFromFeatures(features, initialValue) {
             var result = _.reduce(features, function (accumulator, feature) {
-                var plannedStartDate = feature.PlannedStartDate ? Ext.Date.parse(feature.PlannedStartDate, 'c') : undefined;
-                var actualStartDate = feature.ActualStartDate ? Ext.Date.parse(feature.ActualStartDate, 'c') : undefined;
-                var plannedEndDate = feature.PlannedEndDate ? Ext.Date.parse(feature.PlannedEndDate, 'c') : undefined;
+                var plannedStartDate = feature.get('PlannedStartDate') ? Ext.Date.parse(feature.get('PlannedStartDate'), 'c') : undefined;
+                var actualStartDate = feature.get('ActualStartDate') ? Ext.Date.parse(feature.get('ActualStartDate'), 'c') : undefined;
+                var plannedEndDate = feature.get('PlannedEndDate') ? Ext.Date.parse(feature.get('PlannedEndDate'), 'c') : undefined;
 
                 accumulator.addDates(plannedStartDate, actualStartDate, plannedEndDate);
 

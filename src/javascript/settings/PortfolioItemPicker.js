@@ -24,6 +24,10 @@
             'Ext.form.field.Field'
         ],
 
+        config: {
+            settingsUtils: {}
+        },
+
         emptyText: '<p>No portfolio items match your search criteria.</p>',
 
         portfolioItemScope: SettingsUtils.SCOPE_RELEASE_PORTFOLIO_ITEMS,
@@ -101,8 +105,10 @@
             }
         ],
 
-        config: {
-            iterationData: undefined
+        constructor: function (config) {
+            this.initConfig(config);
+            this.callParent(arguments);
+            return this;
         },
 
         beforeRender: function () {
@@ -114,7 +120,7 @@
 
         _configureRadio: function () {
             var currentSetting = {};
-            currentSetting[SettingsUtils.SETTING_NAME_SCOPE] = SettingsUtils.getScope();
+            currentSetting[SettingsUtils.SETTING_NAME_SCOPE] = this.config.settingsUtils.getScope();
             var radioGroup = this.down('#scopeRadioGroup');
             radioGroup.on({
                 scope: this,
@@ -127,13 +133,13 @@
 
         _configureReleasePicker: function () {
             var picker = this.down('#' + RELEASE_PICKER_ITEMID);
-            picker.setValue(SettingsUtils.getRelease()._ref);
-            picker.on('change', function(element) {
+            picker.setValue(this.config.settingsUtils.getRelease()._ref);
+            picker.on('change', function (element) {
                 this._onReleaseChange(element.getRecord());
             }, this);
         },
 
-        _onReleaseChange: function(release) {
+        _onReleaseChange: function (release) {
             this.release = release;
         },
 
@@ -359,7 +365,7 @@
 
             switch (this.portfolioItemScope) {
                 case SettingsUtils.SCOPE_RELEASE_PORTFOLIO_ITEMS:
-                    _.merge(returnObject, SettingsUtils.createReleaseSettings(this.release));
+                    _.merge(returnObject, this.config.settingsUtils.createReleaseSettings(this.release));
                     break;
                 case SettingsUtils.SCOPE_INDIVIDUAL_PORTFOLIO_ITEMS:
                 default:
@@ -375,7 +381,7 @@
                         returnObject.portfolioItemPicker = "";
                     }
 
-                    piSettings = SettingsUtils.createPortfolioItemsSettings(this.portfolioItems);
+                    piSettings = this.config.settingsUtils.createPortfolioItemsSettings(this.portfolioItems);
 
                     _.merge(returnObject, piSettings);
 

@@ -11,7 +11,7 @@
 Ext.define("com.ca.technicalservices.Burnupdown", {
     extend: 'Rally.app.App',
 
-    layout: 'fit',
+    //layout: 'fit',
 
     requires: [
         'SettingsUtils',
@@ -25,7 +25,7 @@ Ext.define("com.ca.technicalservices.Burnupdown", {
 
     listeners: {},
 
-    iterationData: undefined,
+    settingsUtils: undefined,
 
     config: {
         defaultSettings: {
@@ -45,31 +45,64 @@ Ext.define("com.ca.technicalservices.Burnupdown", {
         return [
             {
                 xtype: 'chartportfolioitempicker',
-                app: Rally.getApp(),
+                settingsUtils: this.settingsUtils,
                 height: 350
             }
         ];
     },
 
+    addControls: function () {
+        var settingsControls = Ext.create("com.ca.technicalservices.Burnupdown.PortfolioItemPicker", {
+            settingsUtils: this.settingsUtils
+        });
+        var settingsForm = Ext.create("Ext.form.Panel", {
+            xtype: 'form',
+            title: 'Chart Settings',
+            items: [
+                settingsControls
+            ],
+            buttons: [{
+                text: 'Update',
+                scope: this,
+                handler: function () {
+                    // The getForm() method returns the Ext.form.Basic instance:
+                    //var form = this.up('form').getForm();
+                    settingsControls.getSubmitData();
+                    this.removeAll();
+                    this.buildChart();
+                }
+            }]
+        });
+        this.add(settingsForm);
+    },
+
     launch: function () {
+        this.settingsUtils = Ext.create('SettingsUtils');
+        this.buildChart();
+    },
+
+    buildChart: function () {
         var promise;
         var release, features, stories, startDate, endDate, iterationCapacitiesManager;
 
         this.setLoading("Loading data ...");
 
         var releaseManager = Ext.create('com.ca.technicalservices.Burnupdown.ReleaseManager');
-
-        if (SettingsUtils.isReleaseScope()) {
-            promise = releaseManager.getReleaseByName(SettingsUtils.getRelease().Name)
+        if (this.settingsUtils.isReleaseScope()) {
+            promise = releaseManager.getReleaseByName(this.settingsUtils.getRelease().Name)
         } else {
             promise = Deft.promise.Promise.when(undefined);
         }
+
+        this.addControls();
 
         promise.then({
             scope: this,
             success: function (releaseData) {
                 release = releaseData;
-                var featureManager = Ext.create('com.ca.technicalservices.Burnupdown.FeatureManager');
+                var featureManager = Ext.create('com.ca.technicalservices.Burnupdown.FeatureManager', {
+                    settingsUtils: this.settingsUtils
+                });
                 return featureManager.getFeatures(release);
             }
         })
@@ -100,7 +133,7 @@ Ext.define("com.ca.technicalservices.Burnupdown", {
                 scope: this,
                 success: function () {
                     var storyOids = _.pluck(stories, 'ObjectID');
-                    var chart = this.add({
+                    var chart = this.insert(0, {
                         xtype: 'rallychart',
                         storeType: 'Rally.data.lookback.SnapshotStore',
                         storeConfig: this._getStoreConfig(storyOids),
@@ -194,10 +227,10 @@ Ext.define("com.ca.technicalservices.Burnupdown", {
 
     _getChartTitle: function (release, features) {
         var result;
-        if ( SettingsUtils.isReleaseScope() ) {
+        if (this.settingsUtils.isReleaseScope()) {
             result = 'Release: ' + release.get('Name');
         } else {
-            result = 'Features: ' + _.map(features, function(feature) {
+            result = 'Features: ' + _.map(features, function (feature) {
                 return feature.get('FormattedID');
             }).join(', ');
         }

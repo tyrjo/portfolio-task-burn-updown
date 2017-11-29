@@ -4,74 +4,84 @@
     Ext.define("SettingsUtils", {
         alias: "tssettingsutils",
 
+        // TODO convert methods to non-static, pass the instance around the app, and allow it to override app settings
+        // with per-session local settings
         statics: {
             SETTING_NAME_SCOPE: 'portfolioItemScope',
             SETTING_NAME_RELEASE: 'release',
             SETTING_NAME_PORTFOLIO_ITEMS: 'portfolioItems',
             SCOPE_INDIVIDUAL_PORTFOLIO_ITEMS: 'individual',
             SCOPE_RELEASE_PORTFOLIO_ITEMS: 'release',
+        },
 
-            createPortfolioItemsSettings: function (portfolioItems) {
-                var result = {};
-                var piSettings = portfolioItems.map(function (item) {
-                    return {
-                        _ref: item._ref,
-                        oid: Rally.util.Ref.getOidFromRef(item._ref),
-                        PlannedStartDate: item.PlannedStartDate,
-                        ActualStartDate: item.ActualStartDate,
-                        PlannedEndDate: item.PlannedEndDate
-                    }
-                });
+        localSettings: undefined,
 
-                result[this.SETTING_NAME_PORTFOLIO_ITEMS] = JSON.stringify(piSettings);
-                return result;
-            },
+        constructor: function() {
+          this.localSettings = Rally.getApp().getSettings();
+        },
 
-            createReleaseSettings: function (release) {
-                var result = {};
-                var releaseSettings = {};
-                if (release) {
-                    releaseSettings = {
-                        _ref: release.get('_ref'),
-                        ObjectID: Rally.util.Ref.getOidFromRef(release.get('_ref')),
-                        Name: release.get('Name'),
-                        ReleaseStartDate: release.get('ReleaseStartDate'),
-                        ReleaseDate: release.get('ReleaseDate')
-                    };
+        getSetting: function (key) {
+            return this.localSettings[key];
+        },
+
+        createPortfolioItemsSettings: function (portfolioItems) {
+            var piSettings = portfolioItems.map(function (item) {
+                return {
+                    _ref: item._ref,
+                    oid: Rally.util.Ref.getOidFromRef(item._ref),
+                    PlannedStartDate: item.PlannedStartDate,
+                    ActualStartDate: item.ActualStartDate,
+                    PlannedEndDate: item.PlannedEndDate
                 }
-                result[this.SETTING_NAME_RELEASE] = JSON.stringify(releaseSettings);
-                return result;
-            },
+            });
 
-            getPortfolioItems: function () {
-                var piSetting = Rally.getApp().getSetting(this.SETTING_NAME_PORTFOLIO_ITEMS) || '[]';
-                var result;
-                try {
-                    result = JSON.parse(piSetting);
-                } catch (e) {
-                    //ignored
-                }
-                return result;
-            },
+            this.localSettings[SettingsUtils.SETTING_NAME_PORTFOLIO_ITEMS] = JSON.stringify(piSettings);
+            return this.localSettings;
+        },
 
-            getRelease: function () {
-                var releaseSetting = Rally.getApp().getSetting(this.SETTING_NAME_RELEASE) || '{}';
-                var result;
-                try {
-                    result = JSON.parse(releaseSetting);
-                } catch (e) {
-                    //ignored
-                }
-                return result;
-            },
-
-            getScope: function () {
-                return Rally.getApp().getSetting(this.SETTING_NAME_SCOPE);
-            },
-
-            isReleaseScope: function () {
-                return Rally.getApp().getSetting(SettingsUtils.SETTING_NAME_SCOPE) === SettingsUtils.SCOPE_RELEASE_PORTFOLIO_ITEMS;
+        createReleaseSettings: function (release) {
+            var releaseSettings = {};
+            if (release) {
+                releaseSettings = {
+                    _ref: release.get('_ref'),
+                    ObjectID: Rally.util.Ref.getOidFromRef(release.get('_ref')),
+                    Name: release.get('Name'),
+                    ReleaseStartDate: release.get('ReleaseStartDate'),
+                    ReleaseDate: release.get('ReleaseDate')
+                };
             }
+            this.localSettings[SettingsUtils.SETTING_NAME_RELEASE] = JSON.stringify(releaseSettings);
+            return this.localSettings;
+        },
+
+        getPortfolioItems: function () {
+            var piSetting = this.getSetting(SettingsUtils.SETTING_NAME_PORTFOLIO_ITEMS) || '[]';
+            var result;
+            try {
+                result = JSON.parse(piSetting);
+            } catch (e) {
+                //ignored
+            }
+            return result;
+        },
+
+        getRelease: function () {
+            var releaseSetting = this.getSetting(SettingsUtils.SETTING_NAME_RELEASE) || '{}';
+            var result;
+            try {
+                result = JSON.parse(releaseSetting);
+            } catch (e) {
+                //ignored
+            }
+            return result;
+        },
+
+        getScope: function () {
+            return this.getSetting(SettingsUtils.SETTING_NAME_SCOPE);
+        },
+
+        isReleaseScope: function () {
+            return this.getSetting(SettingsUtils.SETTING_NAME_SCOPE) === SettingsUtils.SCOPE_RELEASE_PORTFOLIO_ITEMS;
         }
     })
     ;

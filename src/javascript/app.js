@@ -10,20 +10,7 @@
 
 Ext.define("com.ca.technicalservices.Burnupdown", {
     extend: 'Rally.app.App',
-
-    //layout: 'fit',
-
-    requires: [
-        'SettingsUtils',
-        'com.ca.technicalservices.Burnupdown.FeatureManager',
-        'com.ca.technicalservices.Burnupdown.StoriesManager',
-        'com.ca.technicalservices.Burnupdown.UserIterationCapacitiesManager',
-        'com.ca.technicalservices.Burnupdown.DateManager',
-        'com.ca.technicalservices.Burnupdown.Calculator',
-        'com.ca.technicalservices.Burnupdown.PortfolioItemPicker'
-    ],
-
-    listeners: {},
+    componentCls: 'app',
 
     settingsUtils: undefined,
 
@@ -32,6 +19,29 @@ Ext.define("com.ca.technicalservices.Burnupdown", {
             portfolioItemPicker: ''
         }
     },
+
+    layout: {
+        type: 'vbox',
+        align: 'stretch'
+    },
+
+    items: [
+        {
+            xtype: 'container',
+            itemId: 'chartArea',
+            layout: 'fit',
+            flex: 4
+        },
+        {
+            xtype: 'container',
+            itemId: 'controlsArea',
+            layout: {
+                type: 'vbox',
+                align: 'right'
+            }
+        }
+    ],
+
 
     hierarchicalRequirementFields: [
         'Name',
@@ -73,7 +83,7 @@ Ext.define("com.ca.technicalservices.Burnupdown", {
                 }
             }]
         });
-        this.add(settingsForm);
+        this.down('#controlsArea').add(settingsForm);
     },
 
     launch: function () {
@@ -133,7 +143,7 @@ Ext.define("com.ca.technicalservices.Burnupdown", {
                 scope: this,
                 success: function () {
                     var storyOids = _.pluck(stories, 'ObjectID');
-                    var chart = this.insert(0, {
+                    var chart = this.down('#chartArea').add({
                         xtype: 'rallychart',
                         storeType: 'Rally.data.lookback.SnapshotStore',
                         storeConfig: this._getStoreConfig(storyOids),

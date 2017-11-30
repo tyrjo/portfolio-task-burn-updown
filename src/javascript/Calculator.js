@@ -20,7 +20,8 @@
     Ext.define('com.ca.technicalservices.Burnupdown.Calculator', {
         extend: 'Rally.data.lookback.calculator.TimeSeriesCalculator',
         config: {
-            iterationCapacitiesManager: undefined
+            iterationCapacitiesManager: undefined,
+            updateProjectedDoneDateCallback: undefined
         },
 
         remainingIdealTodo: undefined,
@@ -49,6 +50,11 @@
         runCalculation: function (snapshots) {
             var result = this.callParent(arguments);
             result = this._nullFutureData(result);
+
+            // Today's capcity and remaining to do have been updated
+            if ( this.config.updateProjectedDoneDateCallback ) {
+                this.config.updateProjectedDoneDateCallback(this.currentCapacity, this.currentTodo);
+            }
 
             // TODO (tj) handle features of same name
             var metricNames = {};
@@ -163,13 +169,16 @@
                 // Haven't started yet
                 result = null;
             } else if (index == this.todayIndex) {
-                // First day To Do data is available, this is start of forcast burndown
+                // First day To Do data is available, this is start of forecast burndown
                 result = snapshot[METRIC_NAME_TOTAL_TODO];
+                this.currentTodo = result;
             } else {
                 var latestValidCapacitySnapshot;
                 latestValidCapacitySnapshot = seriesData[this.todayIndex];
 
                 var currentCapacity = this._getDailyCapacityForTick(latestValidCapacitySnapshot);
+
+                this.currentCapacity = currentCapacity;
 
                 var priorSnapshot = seriesData[index - 1];
 

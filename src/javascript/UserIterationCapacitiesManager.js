@@ -48,7 +48,7 @@
 
                 // add capacity data
                 iteration.capacity = capacityTotals[iteration._ref];
-                iteration.dailyCapacity = iteration.capacity / _workingDayCount.call(this, iteration);
+                iteration.dailyCapacity = Math.floor(iteration.capacity / _workingDayCount.call(this, iteration));
 
                 iterations[iteration._ref] = iteration;
             }, this);

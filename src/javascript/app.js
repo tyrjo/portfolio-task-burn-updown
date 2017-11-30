@@ -34,11 +34,29 @@ Ext.define("com.ca.technicalservices.Burnupdown", {
         },
         {
             xtype: 'container',
-            itemId: 'controlsArea',
+            itemId: 'detailsArea',
             layout: {
-                type: 'vbox',
-                align: 'right'
-            }
+                type: 'hbox'
+            },
+            items: [
+                {
+                   xtype: 'form',
+                    items: [
+                        {
+                            xtype: 'component',
+                            itemId: 'projectedDays',
+                        }
+                    ]
+                },
+                {
+                    xtype: 'container',
+                    itemId: 'controlsArea',
+                    layout: {
+                        type: 'vbox',
+                        align: 'right'
+                    }
+                }
+            ]
         }
     ],
 
@@ -153,7 +171,8 @@ Ext.define("com.ca.technicalservices.Burnupdown", {
                             startDate: startDate,
                             endDate: endDate,
                             iterationCapacitiesManager: iterationCapacitiesManager,
-                            features: features
+                            features: features,
+                            updateProjectedDoneDateCallback: this._updateProjectedDoneDate.bind(this)
                         },
                         chartConfig: this._getChartConfig(this._getChartTitle(release, features)),
                         loadMask: false,
@@ -245,5 +264,16 @@ Ext.define("com.ca.technicalservices.Burnupdown", {
             }).join(', ');
         }
         return result;
+    },
+
+    _updateProjectedDoneDate: function (currentCapacity, currentTodo) {
+        console.log(currentCapacity, currentTodo);
+        var remainingDays = 'Unknown';
+        if ( currentTodo == 0 ) {
+            remainingDays = 'None';
+        } else if ( currentCapacity > 0 ) {
+            remainingDays = Math.ceil(currentTodo / currentCapacity);
+        }
+        this.down('#projectedDays').update('Projected Remaining Days: ' + remainingDays);
     }
 });

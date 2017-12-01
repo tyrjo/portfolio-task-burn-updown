@@ -5,6 +5,7 @@
 
         return {
             config: {
+                settingsUtils: {},
                 featureFields: [
                     'ObjectID',
                     'Name',
@@ -27,7 +28,7 @@
             if (release) {
                 promise = _getFeaturesFromRelease.call(this, release);
             } else {
-                promise = _getFeaturesFromPis.call(this, SettingsUtils.getPortfolioItems());
+                promise = _getFeaturesFromPis.call(this, this.config.settingsUtils.getPortfolioItems());
             }
             return promise;
         }

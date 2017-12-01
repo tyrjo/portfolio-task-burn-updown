@@ -24,9 +24,17 @@
             'Ext.form.field.Field'
         ],
 
+        config: {
+            settingsUtils: {}
+        },
+
         emptyText: '<p>No portfolio items match your search criteria.</p>',
 
         portfolioItemScope: SettingsUtils.SCOPE_RELEASE_PORTFOLIO_ITEMS,
+
+        portfolioItemsAttributes: ['ObjectID', 'Project', 'WorkSpace', 'FormattedID', 'Name', 'ActualStartDate', 'PlannedStartDate', 'ActualEndDate', 'PlannedEndDate'],
+
+        portfolioItems: [],
 
         release: undefined,
 
@@ -101,8 +109,10 @@
             }
         ],
 
-        config: {
-            iterationData: undefined
+        constructor: function (config) {
+            this.initConfig(config);
+            this.callParent(arguments);
+            return this;
         },
 
         beforeRender: function () {
@@ -114,7 +124,7 @@
 
         _configureRadio: function () {
             var currentSetting = {};
-            currentSetting[SettingsUtils.SETTING_NAME_SCOPE] = SettingsUtils.getScope();
+            currentSetting[SettingsUtils.SETTING_NAME_SCOPE] = this.config.settingsUtils.getScope();
             var radioGroup = this.down('#scopeRadioGroup');
             radioGroup.on({
                 scope: this,
@@ -127,13 +137,13 @@
 
         _configureReleasePicker: function () {
             var picker = this.down('#' + RELEASE_PICKER_ITEMID);
-            picker.setValue(SettingsUtils.getRelease()._ref);
-            picker.on('change', function(element) {
+            picker.setValue(this.config.settingsUtils.getRelease()._ref);
+            picker.on('change', function (element) {
                 this._onReleaseChange(element.getRecord());
             }, this);
         },
 
-        _onReleaseChange: function(release) {
+        _onReleaseChange: function (release) {
             this.release = release;
         },
 
@@ -142,9 +152,8 @@
         },
 
         _configurePicker: function () {
-            this._setValueFromSettings();
             this._setupRequestContext();
-            this._loadPortfolioItems();
+            this._createPortfolioItemStore();
         },
 
         _setupRequestContext: function () {
@@ -154,62 +163,42 @@
             };
         },
 
-        _setValueFromSettings: function () {
-            var newSettingsValue = Rally.getApp().getSetting("portfolioItemPicker"),
-                oldSettingsValue = Rally.getApp().getSetting("buttonchooser");
-
-            if (this._isSettingValid(newSettingsValue)) {
-                this.setValue(newSettingsValue);
-            } else if (this._isSettingValid(oldSettingsValue)) {
-                this.setValue(Ext.JSON.decode(oldSettingsValue).artifact._ref);
-            } else {
-                this.setValue("&nbsp;");
-            }
-        },
-
-        _isSettingValid: function (value) {
-            return value && value !== "undefined";
-        },
-
-        _loadPortfolioItems: function () {
-            if (this._isSavedValueValid()) {
-                this._createPortfolioItemStore();
-            }
-        },
-
         _createPortfolioItemStore: function () {
-            if (Ext.isEmpty(this.value) || this.value.length === 0) {
-                return;
+            // Get the current PIs setting, and attempt to load each PI by ObjectID
+            var portfolioItemsSetting = this.config.settingsUtils.getPortfolioItems();
+
+            if (portfolioItemsSetting.length >0) {
+
+                var filters = Rally.data.wsapi.Filter.or(
+                    Ext.Array.map(portfolioItemsSetting, function (pi) {
+                        return {
+                            property: "ObjectID",
+                            operator: "=",
+                            value: Rally.util.Ref.getOidFromRef(pi._ref)
+                        };
+                    })
+                );
+
+                Ext.create("Rally.data.wsapi.Store", {
+                    model: Ext.identityFn("Portfolio Item"),
+                    filters: filters,
+                    context: this.requestContext,
+                    fetch: this.portfolioItemsAttributes,
+                    autoLoad: true,
+                    listeners: {
+                        load: this._onPortfolioItemsRetrieved,
+                        scope: this
+                    }
+                });
             }
-            var filters = Rally.data.wsapi.Filter.or(
-                Ext.Array.map(this.value, function (pi_ref) {
-                    return {
-                        property: "ObjectID",
-                        operator: "=",
-                        value: Rally.util.Ref.getOidFromRef(pi_ref)
-                    };
-                })
-            );
-
-            Ext.create("Rally.data.wsapi.Store", {
-                model: Ext.identityFn("Portfolio Item"),
-                filters: filters,
-                context: this.requestContext,
-                autoLoad: true,
-                listeners: {
-                    load: this._onPortfolioItemsRetrieved,
-                    scope: this
-                }
-            });
         },
 
-        _isSavedValueValid: function () {
-            return Ext.isArray(this.value) && this.value !== "undefined";
-        },
-
-        _onPortfolioItemsRetrieved: function (store, records) {
-            var storeData = records;
-            this._handleStoreResults(storeData);
+        _onPortfolioItemsRetrieved: function (store, results) {
+            var pis = results;
+            if ( !Ext.isArray(pis) ) {
+                pis = [results];
+            }
+            this._handleStoreResults(pis);
         },
 
         _setDisplayValue: function () {
@@ -235,9 +224,6 @@
             if (Ext.isEmpty(this.portfolioItems)) {
                 return;
             }
-            if (!Ext.isArray(this.portfolioItems)) {
-                this.portfolioItems = [this.portfolioItems];
-            }
 
             return Ext.Array.map(this.portfolioItems, function (pi) {
                 return {
@@ -259,55 +245,26 @@
                 return ( record.FormattedID != pi.FormattedID );
             });
 
-            this.portfolioItemRefs = Ext.Array.map(this.portfolioItems, function (pi) {
-                return pi._ref;
-            });
-            this.setValue(this.portfolioItemRefs);
-
             this._setDisplayValue();
         },
 
         _onPortfolioItemChosen: function (dialog, resultStore) {
             var items = Ext.Array.merge(resultStore, this.portfolioItems);
-
             this._handleStoreResults(items);
             this._destroyChooser();
         },
 
-        _filterUniquePIs: function (items) {
-            var hash = {};
-            Ext.Array.each(items, function (item) {
-                var ref = item._ref || item.get('_ref');
-                hash[ref] = item;
+        _handleStoreResults: function (results) {
+            var pis = Ext.Array.map(results, function (pi) {
+                if (Ext.isFunction(pi.getData)) {
+                    return pi.getData();
+                }
+                return pi;
             });
 
-            return Ext.Object.getValues(hash);
-        },
+            this.portfolioItems = _.unique(pis, '_ref');
 
-        _handleStoreResults: function (store) {
-            if (store) {
-                if (Ext.isArray(store)) {
-                    var pis = Ext.Array.map(store, function (pi) {
-                        if (Ext.isFunction(pi.getData)) {
-                            return pi.getData();
-                        }
-                        return pi;
-                    });
-
-                    this.portfolioItems = this._filterUniquePIs(pis);
-
-                    this.portfolioItemRefs = Ext.Array.map(this.portfolioItems, function (pi) {
-                        return pi._ref;
-                    });
-
-                    this._setDisplayValue();
-                    this.setValue(this.portfolioItemRefs);
-                } else if (store.data) {
-                    this.portfolioItem = store.data;
-                    this._setDisplayValue();
-                    this.setValue(this.portfolioItem._ref);
-                }
-            }
+            this._setDisplayValue();
         },
 
         _getChooserConfig: function () {
@@ -328,7 +285,7 @@
                 storeConfig: {
                     project: null,
                     context: this.requestContext,
-                    fetch: ['ObjectID', 'Project', 'WorkSpace', 'FormattedID', 'Name', 'ActualStartDate', 'PlannedStartDate', 'ActualEndDate', 'PlannedEndDate']
+                    fetch: this.portfolioItemsAttributes
                 },
                 gridConfig: {
                     viewConfig: {
@@ -341,49 +298,20 @@
             };
         },
 
-        setValue: function (value) {
-
-            if (value && value !== "undefined") {
-                if (Ext.isString(value)) {
-                    value = value.split(',');
-                }
-                this.value = value;
-            }
-            else {
-                this.value = Rally.getApp().getSetting("portfolioItemPicker");
-            }
-        },
-
         getSubmitData: function () {
-            var returnObject = {};
+            var result = {};
 
             switch (this.portfolioItemScope) {
                 case SettingsUtils.SCOPE_RELEASE_PORTFOLIO_ITEMS:
-                    _.merge(returnObject, SettingsUtils.createReleaseSettings(this.release));
+                    result = this.config.settingsUtils.createReleaseSettings(this.release);
                     break;
                 case SettingsUtils.SCOPE_INDIVIDUAL_PORTFOLIO_ITEMS:
                 default:
-                    if (this.portfolioItemRefs && Ext.isArray(this.portfolioItemRefs)) {
-                        this.setValue(this.portfolioItemRefs);
-                        returnObject.portfolioItemPicker = this.portfolioItemRefs;
-                    } else if (this.portfolioItem) {
-
-                        this.setValue(this.portfolioItem._ref);
-                        returnObject.portfolioItemPicker = this.portfolioItem._ref;
-                    }
-                    else {
-                        returnObject.portfolioItemPicker = "";
-                    }
-
-                    piSettings = SettingsUtils.createPortfolioItemsSettings(this.portfolioItems);
-
-                    _.merge(returnObject, piSettings);
-
+                    result = this.config.settingsUtils.createPortfolioItemsSettings(this.portfolioItems);
                     break;
             }
 
-
-            return returnObject;
+            return result;
         },
 
         _onScopeChange: function (newScope) {

@@ -7,7 +7,7 @@
     var METRIC_NAME_TOTAL_ACTUAL = 'Total Actual';
     var METRIC_NAME_TOTAL_CAPACITY = 'Total Capacity';
     var METRIC_NAME_DAILY_CAPACITY = 'Daily Capacity';
-    var METRIC_NAME_IDEAL_CAPACITY_BURNDOWN = 'Ideal Capacity Based Burndown';
+    var METRIC_NAME_IDEAL_CAPACITY_BURNDOWN = 'Capacity Based Burndown';
     var METRIC_NAME_FUTURE_IDEAL_CAPACITY_BURNDOWN = 'Future ' + METRIC_NAME_IDEAL_CAPACITY_BURNDOWN;
     var METRIC_NAME_TASK_ESTIMATE_TOTAL = 'Refined Estimate';
 

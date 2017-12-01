@@ -28,13 +28,14 @@
             var piSettings = portfolioItems.map(function (item) {
                 return {
                     _ref: item._ref,
+                    FormattedID: item.FormattedID,
                     oid: Rally.util.Ref.getOidFromRef(item._ref),
                     PlannedStartDate: item.PlannedStartDate,
                     ActualStartDate: item.ActualStartDate,
                     PlannedEndDate: item.PlannedEndDate
                 }
             });
-
+            this.localSettings[SettingsUtils.SETTING_NAME_SCOPE] = SettingsUtils.SCOPE_INDIVIDUAL_PORTFOLIO_ITEMS;
             this.localSettings[SettingsUtils.SETTING_NAME_PORTFOLIO_ITEMS] = JSON.stringify(piSettings);
             return this.localSettings;
         },
@@ -50,6 +51,7 @@
                     ReleaseDate: release.get('ReleaseDate')
                 };
             }
+            this.localSettings[SettingsUtils.SETTING_NAME_SCOPE] = SettingsUtils.SCOPE_RELEASE_PORTFOLIO_ITEMS;
             this.localSettings[SettingsUtils.SETTING_NAME_RELEASE] = JSON.stringify(releaseSettings);
             return this.localSettings;
         },
@@ -60,7 +62,7 @@
             try {
                 result = JSON.parse(piSetting);
             } catch (e) {
-                //ignored
+                result = [];
             }
             return result;
         },

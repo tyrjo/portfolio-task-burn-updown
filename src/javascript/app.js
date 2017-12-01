@@ -36,11 +36,19 @@ Ext.define("com.ca.technicalservices.Burnupdown", {
             xtype: 'container',
             itemId: 'detailsArea',
             layout: {
-                type: 'hbox'
+                type: 'hbox',
+                align: 'stretch'
             },
             items: [
                 {
-                   xtype: 'form',
+                    xtype: 'form',
+                    title: 'Metrics',
+                    flex: 1,
+                    layout: {
+                        type: 'vbox',
+                        align: 'left',
+                    },
+                    border: false,
                     items: [
                         {
                             xtype: 'component',
@@ -50,10 +58,15 @@ Ext.define("com.ca.technicalservices.Burnupdown", {
                 },
                 {
                     xtype: 'container',
+                    width: 30
+                },
+                {
+                    xtype: 'container',
                     itemId: 'controlsArea',
+                    flex: 1,
                     layout: {
                         type: 'vbox',
-                        align: 'right'
+                        align: 'stretch'
                     }
                 }
             ]
@@ -89,6 +102,7 @@ Ext.define("com.ca.technicalservices.Burnupdown", {
             items: [
                 settingsControls
             ],
+            border: false,
             buttons: [{
                 text: 'Update',
                 scope: this,
@@ -96,7 +110,8 @@ Ext.define("com.ca.technicalservices.Burnupdown", {
                     // The getForm() method returns the Ext.form.Basic instance:
                     //var form = this.up('form').getForm();
                     settingsControls.getSubmitData();
-                    this.removeAll();
+                    this.down('#controlsArea').removeAll();
+                    this.down('#chartArea').removeAll();
                     this.buildChart();
                 }
             }]
@@ -267,13 +282,12 @@ Ext.define("com.ca.technicalservices.Burnupdown", {
     },
 
     _updateProjectedDoneDate: function (currentCapacity, currentTodo) {
-        console.log(currentCapacity, currentTodo);
         var remainingDays = 'Unknown';
-        if ( currentTodo == 0 ) {
+        if (currentTodo == 0) {
             remainingDays = 'None';
-        } else if ( currentCapacity > 0 ) {
+        } else if (currentCapacity > 0) {
             remainingDays = Math.ceil(currentTodo / currentCapacity);
         }
-        this.down('#projectedDays').update('Projected Remaining Days: ' + remainingDays);
+        this.down('#projectedDays').update('Projected Days Until Done: ' + remainingDays);
     }
 });

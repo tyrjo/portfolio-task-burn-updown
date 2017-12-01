@@ -4,8 +4,6 @@
     Ext.define("SettingsUtils", {
         alias: "tssettingsutils",
 
-        // TODO convert methods to non-static, pass the instance around the app, and allow it to override app settings
-        // with per-session local settings
         statics: {
             SETTING_NAME_SCOPE: 'portfolioItemScope',
             SETTING_NAME_RELEASE: 'release',

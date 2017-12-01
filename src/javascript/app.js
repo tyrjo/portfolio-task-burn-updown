@@ -98,7 +98,7 @@ Ext.define("com.ca.technicalservices.Burnupdown", {
         });
         var settingsForm = Ext.create("Ext.form.Panel", {
             xtype: 'form',
-            title: 'Chart Settings',
+            title: 'Override Default Chart Settings',
             items: [
                 settingsControls
             ],

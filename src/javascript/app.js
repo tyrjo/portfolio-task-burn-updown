@@ -289,6 +289,6 @@ Ext.define("com.ca.technicalservices.Burnupdown", {
         } else if (currentCapacity > 0) {
             remainingDays = Math.ceil(currentTodo / currentCapacity);
         }
-        this.down('#projectedDays').update('Projected Days Until Done: ' + remainingDays);
+        this.down('#projectedDays').update('Projected Work Days Until Done: ' + remainingDays);
     }
 });

@@ -35,6 +35,7 @@ Ext.define("com.ca.technicalservices.Burnupdown", {
         {
             xtype: 'container',
             itemId: 'detailsArea',
+            height: 200,
             layout: {
                 type: 'hbox',
                 align: 'stretch'

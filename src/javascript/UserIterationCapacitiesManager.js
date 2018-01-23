@@ -76,21 +76,21 @@
 
         function _getCapacitiesForDateString(dateString) {
             var date = Ext.Date.parse(dateString, 'c');
-            var iteration = _.find(iterations, function (value) {
-                if (Ext.Date.between(date, value.StartDate, value.EndDate)) {
-                    return true;
-                } else {
-                    return false;
-                }
+            var matchingIterations = _.filter(iterations, function (value) {
+                return Ext.Date.between(date, value.StartDate, value.EndDate);
             });
-
-            return iteration ? {
-                total: iteration.capacity,
-                daily: iteration.dailyCapacity
-            } : {
-                total: 0,
-                daily: 0
-            };
+            var result = _.reduce(
+                matchingIterations,
+                function (accumulator, value) {
+                    accumulator.total += value.capacity;
+                    accumulator.daily += value.dailyCapacity;
+                    return accumulator;
+                },
+                {
+                    total: 0,
+                    daily: 0
+                });
+            return result;
         }
 
         function _loadCapacitiesForDates(startDate, endDate) {
